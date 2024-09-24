@@ -1,0 +1,42 @@
+// построить дерево
+// посчитать значение
+// дерево обратно в строку
+
+import runtime;
+import lingo/pegcode/driver;
+
+ArExpr ::= ArSum, ArMul, ArInt;
+    ArSum(lhs: ArExpr, rhs: ArExpr);
+    ArMul(lhs: ArExpr, rhs: ArExpr);
+    ArInt(value: int);
+
+s2ar(str: string) -> ArExpr {
+    grammar_src = "#include grammar.lingo";
+    grammar = compilePegGrammar(grammar_src);
+    actions = defaultPegActions;
+    parsic(grammar, str, actions);
+}
+
+ar2s(expr: ArExpr) -> string {
+    switch (expr) {
+        ArSum(lhs, rhs): concatStrings(["(", ar2s(lhs), " + ", ar2s(rhs), ")"])
+        ArMul(lhs, rhs): concatStrings(["(", ar2s(lhs), " * ", ar2s(rhs), ")"])
+        ArInt(value): i2s(value)
+    }
+}
+
+evaluate(expr: ArExpr) -> int {
+    switch (expr) {
+        ArSum(lhs, rhs): evaluate(lhs) + evaluate(rhs)
+        ArMul(lhs, rhs): evaluate(lhs) * evaluate(rhs)
+        ArInt(value): value
+    }
+}
+
+main() {
+    example = "(2 * (4 + 5))";
+    expr = s2ar(example);
+
+    println(evaluate(expr));
+    println(ar2s(expr))
+}
