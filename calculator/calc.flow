@@ -33,10 +33,94 @@ evaluate(expr: ArExpr) -> int {
     }
 }
 
-main() {
-    example = "(2 * (4 + 5))";
-    expr = s2ar(example);
+Token ::= TokenInt, TokenMul, TokenAdd;
+    TokenInt(value: int);
+    TokenMul();
+    TokenAdd();
 
-    println(evaluate(expr));
-    println(ar2s(expr))
+expr2rpn(expr: ArExpr) -> [Token] {
+    switch (expr) {
+        ArSum(lhs, rhs): concat3(expr2rpn(lhs), expr2rpn(rhs), [TokenAdd()])
+        ArMul(lhs, rhs): concat3(expr2rpn(lhs), expr2rpn(rhs), [TokenMul()])
+        ArInt(value): [TokenInt(value)]
+    }
+}
+
+rpn2string(tokens: [Token]) -> string {
+    strGlue(map(tokens, \tok -> {
+        switch(tok) {
+            TokenAdd(): "+"
+            TokenMul(): "*"
+            TokenInt(val): i2s(val)
+        }
+    }), " ");
+}
+
+rpn2int(tokens: [Token]) -> int {    
+    result = fold(tokens, [], \stack, token -> {
+        switch (token) {
+            TokenInt(value): {
+                arrayPush(stack, value)
+            }
+
+            TokenMul(): {
+                lhs = stack[length(stack) - 1];
+                rhs = stack[length(stack) - 2];
+
+                arrayPush(subrange(stack, 0, length(stack) - 2), lhs * rhs)
+            }
+
+            TokenAdd(): {
+                lhs = stack[length(stack) - 1];
+                rhs = stack[length(stack) - 2];
+
+                arrayPush(subrange(stack, 0, length(stack) - 2), lhs + rhs)
+            }
+        }
+    });
+
+    result[0]
+}
+
+rpn2expr(prn: [Token]) -> ArExpr {
+    result = fold(prn, [], \stack, token -> {
+        switch (token) {
+            TokenInt(value): {
+                arrayPush(stack, ArInt(value))
+            }
+
+            TokenMul(): {
+                lhs = stack[length(stack) - 1];
+                rhs = stack[length(stack) - 2];
+
+                arrayPush(subrange(stack, 0, length(stack) - 2), ArMul(rhs, lhs))
+            }
+
+            TokenAdd(): {
+                lhs = stack[length(stack) - 1];
+                rhs = stack[length(stack) - 2];
+
+                arrayPush(subrange(stack, 0, length(stack) - 2), ArSum(rhs, lhs))
+            }
+        }
+    });
+
+    result[0]
+}
+
+main() {
+    example = "((52 + 77) * (14 + 3))";
+    expr = s2ar(example);   
+    rpn = expr2rpn(expr);
+    rpn_string = rpn2string(rpn);
+    result = rpn2int(rpn);
+    expr_from_rpn = rpn2expr(rpn);
+    expr_to_string = ar2s(expr_from_rpn);
+
+    println(example);
+    println(expr);
+    println(rpn);
+    println(rpn_string);
+    println(result);
+    println(expr_to_string);
 }
