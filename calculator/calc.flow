@@ -31,6 +31,18 @@ s2expr(str: string) -> Expr {
     parsic(grammar, str, defaultPegActions);
 }
 
+expr2s(expr: Expr) -> string {
+    switch (expr) {
+        Add(lhs, rhs): concatStrings(["(", expr2s(lhs), " + ", expr2s(rhs), ")"]);
+        Sub(lhs, rhs): concatStrings(["(", expr2s(lhs), " - ", expr2s(rhs), ")"]);
+        Mul(lhs, rhs): concatStrings(["(", expr2s(lhs), " * ", expr2s(rhs), ")"]);
+        Div(lhs, rhs): concatStrings(["(", expr2s(lhs), " / ", expr2s(rhs), ")"]);
+        Neg(value): concatStrings(["-", expr2s(value)]);
+        Int(value): i2s(value);
+        Var(name): name;
+    }
+}
+
 maybeAdd(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
     maybeMap2(\left, right -> {
         Rational(left.num * right.denom + right.num * left.denom, left.denom * right.denom)
