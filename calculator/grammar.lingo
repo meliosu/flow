@@ -1,6 +1,12 @@
-S = sum | mul | int;
-digit = '0'-'9';
-int = digit+$s { ArInt(s2i($s)) };
+S = int | add | sub | neg | mul | div | var;
+
 ws = (' ' | '\t' | '\n' | '\r')*;
-sum = "(" ws S:l ws "+" ws S:r ws ")" { ArSum(:l, :r) };
-mul = "(" ws S:l ws "*" ws S:r ws ")" { ArMul(:l, :r) };
+digit = '0'-'9';
+
+int = digit+$s { Int(s2i($s)) };
+add = "(" ws S:l ws "+" ws S:r ws ")" { Add(:l, :r) };
+sub = "(" ws S:l ws "-" ws S:r ws ")" { Sub(:l, :r) };
+mul = "(" ws S:l ws "*" ws S:r ws ")" { Mul(:l, :r) };
+div = "(" ws S:l ws "/" ws S:r ws ")" { Div(:l, :r) };
+neg = "(" ws "-" ws S:v ws ")" { Neg(:v) };
+var = ('a'-'z')$name { Var($name) };

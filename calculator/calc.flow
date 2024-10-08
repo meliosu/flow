@@ -1,126 +1,83 @@
-// построить дерево
-// посчитать значение
-// дерево обратно в строку
-
 import runtime;
 import lingo/pegcode/driver;
 
-ArExpr ::= ArSum, ArMul, ArInt;
-    ArSum(lhs: ArExpr, rhs: ArExpr);
-    ArMul(lhs: ArExpr, rhs: ArExpr);
-    ArInt(value: int);
+Rational(num: int, denom: int);
 
-s2ar(str: string) -> ArExpr {
-    grammar_src = "#include grammar.lingo";
-    grammar = compilePegGrammar(grammar_src);
-    actions = defaultPegActions;
-    parsic(grammar, str, actions);
+simplify(value: Rational) -> Rational {
+    div = gcd(value.num, value.denom);
+    Rational(value.num / div, value.denom / div);
 }
 
-ar2s(expr: ArExpr) -> string {
-    switch (expr) {
-        ArSum(lhs, rhs): concatStrings(["(", ar2s(lhs), " + ", ar2s(rhs), ")"])
-        ArMul(lhs, rhs): concatStrings(["(", ar2s(lhs), " * ", ar2s(rhs), ")"])
-        ArInt(value): i2s(value)
+Expr ::= Add, Sub, Mul, Div, Neg, Int, Var;
+    Add(lhs: Expr, rhs: Expr);
+    Sub(lhs: Expr, rhs: Expr);
+    Mul(lhs: Expr, rhs: Expr);
+    Div(lhs: Expr, rhs: Expr);
+    Neg(value: Expr);
+    Int(value: int);
+    Var(name: string);
+    
+s2expr(str: string) -> Expr {
+    grammar = compilePegGrammar("#include grammar.lingo");
+    parsic(grammar, str, defaultPegActions);
+}
+
+maybeAdd(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
+    maybeMap2(\left, right -> {
+        Rational(left.num * right.denom + right.num * left.denom, left.denom * right.denom)
+    })(lhs, rhs)
+}
+
+maybeSub(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
+    maybeMap2(\left, right -> {
+        Rational(left.num * right.denom - right.num * left.denom, left.denom * right.denom)
+    })(lhs, rhs)
+}
+
+maybeMul(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
+    maybeMap2(\left, right -> {
+        Rational(left.num * right.num, left.denom * right.denom)
+    })(lhs, rhs)
+}
+
+maybeDiv(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
+    if (eitherMap(rhs, \r -> r.num != 0, false)) {
+        None();
+    } else {
+        maybeMap2(\left, right -> {
+            Rational(left.num * right.denom, left.denom * right.num);
+        })(lhs, rhs);
     }
 }
 
-evaluate(expr: ArExpr) -> int {
+maybeNeg(value: Maybe<Rational>) -> Maybe<Rational> {
+    maybeMap(value, \v -> Rational(-v.num, v.denom))
+}
+
+expr2r(expr: Expr, variables: Tree<string, Rational>) -> Maybe<Rational> {
     switch (expr) {
-        ArSum(lhs, rhs): evaluate(lhs) + evaluate(rhs)
-        ArMul(lhs, rhs): evaluate(lhs) * evaluate(rhs)
-        ArInt(value): value
+        Add(lhs, rhs): maybeAdd(expr2r(lhs, variables), expr2r(rhs, variables));
+        Sub(lhs, rhs): maybeSub(expr2r(lhs, variables), expr2r(rhs, variables));
+        Mul(lhs, rhs): maybeMul(expr2r(lhs, variables), expr2r(rhs, variables));
+        Div(lhs, rhs): maybeDiv(expr2r(lhs, variables), expr2r(rhs, variables));
+        Neg(value): maybeNeg(expr2r(value, variables));
+        Int(value): Some(Rational(value, 1));
+        Var(name): lookupTree(variables, name);
     }
-}
-
-Token ::= TokenInt, TokenMul, TokenAdd;
-    TokenInt(value: int);
-    TokenMul();
-    TokenAdd();
-
-expr2rpn(expr: ArExpr) -> [Token] {
-    switch (expr) {
-        ArSum(lhs, rhs): concat3(expr2rpn(lhs), expr2rpn(rhs), [TokenAdd()])
-        ArMul(lhs, rhs): concat3(expr2rpn(lhs), expr2rpn(rhs), [TokenMul()])
-        ArInt(value): [TokenInt(value)]
-    }
-}
-
-rpn2string(tokens: [Token]) -> string {
-    strGlue(map(tokens, \tok -> {
-        switch(tok) {
-            TokenAdd(): "+"
-            TokenMul(): "*"
-            TokenInt(val): i2s(val)
-        }
-    }), " ");
-}
-
-rpn2int(tokens: [Token]) -> int {    
-    result = fold(tokens, [], \stack, token -> {
-        switch (token) {
-            TokenInt(value): {
-                arrayPush(stack, value)
-            }
-
-            TokenMul(): {
-                lhs = stack[length(stack) - 1];
-                rhs = stack[length(stack) - 2];
-
-                arrayPush(subrange(stack, 0, length(stack) - 2), lhs * rhs)
-            }
-
-            TokenAdd(): {
-                lhs = stack[length(stack) - 1];
-                rhs = stack[length(stack) - 2];
-
-                arrayPush(subrange(stack, 0, length(stack) - 2), lhs + rhs)
-            }
-        }
-    });
-
-    result[0]
-}
-
-rpn2expr(prn: [Token]) -> ArExpr {
-    result = fold(prn, [], \stack, token -> {
-        switch (token) {
-            TokenInt(value): {
-                arrayPush(stack, ArInt(value))
-            }
-
-            TokenMul(): {
-                lhs = stack[length(stack) - 1];
-                rhs = stack[length(stack) - 2];
-
-                arrayPush(subrange(stack, 0, length(stack) - 2), ArMul(rhs, lhs))
-            }
-
-            TokenAdd(): {
-                lhs = stack[length(stack) - 1];
-                rhs = stack[length(stack) - 2];
-
-                arrayPush(subrange(stack, 0, length(stack) - 2), ArSum(rhs, lhs))
-            }
-        }
-    });
-
-    result[0]
 }
 
 main() {
-    example = "((52 + 77) * (14 + 3))";
-    expr = s2ar(example);   
-    rpn = expr2rpn(expr);
-    rpn_string = rpn2string(rpn);
-    result = rpn2int(rpn);
-    expr_from_rpn = rpn2expr(rpn);
-    expr_to_string = ar2s(expr_from_rpn);
+    vars = fold([
+        Pair("xyz", Rational(5, 7)),
+    ], makeTree(), \tree, p -> setTree(tree, p.first, p.second));
 
-    println(example);
+    example = "(1 + 2)";
+    expr = s2expr(example);
     println(expr);
-    println(rpn);
-    println(rpn_string);
-    println(result);
-    println(expr_to_string);
+    result = expr2r(expr, vars);
+    
+    switch (result) {
+        Some(rational): println(simplify(rational));
+        None(): println("Error");
+    }
 }
