@@ -45,19 +45,20 @@ expr2s(expr: Expr) -> string {
 
 maybeAdd(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
     maybeMap2(\left, right -> {
-        Rational(left.num * right.denom + right.num * left.denom, left.denom * right.denom)
+        denom = lcm(left.denom, right.denom);
+        Rational(left.num * (denom / left.denom) + right.num * (denom / right.denom), denom)
     })(lhs, rhs)
 }
 
 maybeSub(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
-    maybeMap2(\left, right -> {
-        Rational(left.num * right.denom - right.num * left.denom, left.denom * right.denom)
-    })(lhs, rhs)
+    maybeAdd(lhs, maybeMap(rhs, \v -> Rational(-v.num, v.denom)))
 }
 
 maybeMul(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
     maybeMap2(\left, right -> {
-        Rational(left.num * right.num, left.denom * right.denom)
+        left_m = gcd(left.num, right.denom);
+        right_m = gcd(left.denom, right.num);
+        Rational((left.num / left_m) * (right.num / right_m), (left.denom / left_m) * (right.denom / right_m))
     })(lhs, rhs)
 }
 
@@ -65,9 +66,7 @@ maybeDiv(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
     if (eitherMap(rhs, \r -> r.num == 0, false)) {
         None();
     } else {
-        maybeMap2(\left, right -> {
-            Rational(left.num * right.denom, left.denom * right.num);
-        })(lhs, rhs);
+        maybeMul(lhs, maybeMap(rhs, \v -> Rational(v.denom, v.num)));
     }
 }
 
@@ -95,7 +94,7 @@ main() {
 
     example = "(((xyz4 + 2) - (5 / 2)) / ((-ab3_c) + (1 / 2)))";
     expr = s2expr(example);
-    println(expr);
+    println(expr2s(expr));
     result = expr2r(expr, vars);
     
     switch (result) {
