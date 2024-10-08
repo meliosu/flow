@@ -9,4 +9,4 @@ sub = "(" ws S:l ws "-" ws S:r ws ")" { Sub(:l, :r) };
 mul = "(" ws S:l ws "*" ws S:r ws ")" { Mul(:l, :r) };
 div = "(" ws S:l ws "/" ws S:r ws ")" { Div(:l, :r) };
 neg = "(" ws "-" ws S:v ws ")" { Neg(:v) };
-var = ('a'-'z')+$name { Var($name) };
+var = (('a'-'z' | '_') ('a'-'z' | '0'-'9' | '_')*)$name { Var($name) };

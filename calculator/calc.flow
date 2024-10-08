@@ -5,7 +5,16 @@ Rational(num: int, denom: int);
 
 simplify(value: Rational) -> Rational {
     div = gcd(value.num, value.denom);
-    Rational(value.num / div, value.denom / div);
+    new = Rational(value.num / div, value.denom / div);
+    if (new.denom > 0) {
+        new
+    } else {
+        Rational(-new.num, -new.denom)
+    }
+}
+
+r2s(rational: Rational) -> string {
+    i2s(rational.num) + "/" + i2s(rational.denom)
 }
 
 Expr ::= Add, Sub, Mul, Div, Neg, Int, Var;
@@ -41,7 +50,7 @@ maybeMul(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
 }
 
 maybeDiv(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
-    if (eitherMap(rhs, \r -> r.num != 0, false)) {
+    if (eitherMap(rhs, \r -> r.num == 0, false)) {
         None();
     } else {
         maybeMap2(\left, right -> {
@@ -68,16 +77,17 @@ expr2r(expr: Expr, variables: Tree<string, Rational>) -> Maybe<Rational> {
 
 main() {
     vars = fold([
-        Pair("xyz", Rational(5, 7)),
+        Pair("xyz4", Rational(3, 1)),
+        Pair("ab3_c", Rational(3, 2)),
     ], makeTree(), \tree, p -> setTree(tree, p.first, p.second));
 
-    example = "(xyz + 2)";
+    example = "(((xyz4 + 2) - (5 / 2)) / ((-ab3_c) + (1 / 2)))";
     expr = s2expr(example);
     println(expr);
     result = expr2r(expr, vars);
     
     switch (result) {
-        Some(rational): println(simplify(rational));
+        Some(rational): println(r2s(simplify(rational)));
         None(): println("Error");
     }
 }
