@@ -71,7 +71,7 @@ main() {
         Pair("xyz", Rational(5, 7)),
     ], makeTree(), \tree, p -> setTree(tree, p.first, p.second));
 
-    example = "(1 + 2)";
+    example = "(xyz + 2)";
     expr = s2expr(example);
     println(expr);
     result = expr2r(expr, vars);
