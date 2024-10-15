@@ -122,7 +122,7 @@ simplifyExpression(expr: Expr) -> Expr {
             right = simplify(rhs);
 
             if (left == Int(0)) {
-                simplify(Neg(left))
+                simplify(Neg(right))
             } else if (right == Int(0)) {
                 left
             } else {
@@ -172,7 +172,7 @@ simplifyExpression(expr: Expr) -> Expr {
 }
 
 main() {
-    example = "((x * x) * (y * y))";
+    example = "(y / (x * x))";
     expr = s2expr(example);
     derivative = differentiate(expr, "x");
     simplified = simplifyExpression(derivative);
