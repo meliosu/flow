@@ -171,6 +171,66 @@ simplifyExpression(expr: Expr) -> Expr {
     }
 }
 
+toRationalForm(expr: Expr) -> Expr {
+    switch (expr) {
+        Add(lhs, rhs):
+        Sub(lhs, rhs):
+        Mul(lhs, rhs): {
+            left = toRationalForm(lhs);
+            right = toRationalForm(rhs);
+
+            switch (left) {
+                Div(a, b): {
+                    switch (right) {
+                        Div(c, d): Div(Mul(a, c), Mul(b, d));
+                        default: ;
+                    }
+                };
+
+                default: {
+                    switch (right) {
+                        Div(a, b): ;
+                        default: Mul(left, right);
+                    }
+                }
+            }
+        };
+
+        Div(lhs, rhs): {
+            left = toRationalForm(lhs);
+            right = toRationalForm(rhs);
+
+            switch (left) {
+                Div(a, b): {
+                    switch (right) {
+                        Div(c, d): Div(Mul(a, d), Mul(b, c));
+                        default: Div(a, Mul(b, right));
+                    }
+                };
+
+                default: {
+                    switch (right) {
+                        Div(a, b): Div(Mul(b, right), a);
+                        default: Div(left, right);
+                    }
+                };
+            }
+        }
+
+        Neg(expr): {
+            e = toRationalForm(expr);
+
+            switch (e) {
+                Div(a, b): Div(Neg(a), b);
+                default: Neg(e);
+            }
+        };
+
+        Int(value): Int(value);
+        Var(name): Var(name);
+    }
+}
+
 main() {
     example = "((x * x) * (y * y))";
     expr = s2expr(example);
