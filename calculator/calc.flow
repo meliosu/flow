@@ -180,8 +180,8 @@ toRationalForm(expr: Expr) -> Expr {
             switch (left) {
                 Div(a, b): {
                     switch (right) {
-                        Div(c, d): Div(Add(Mul(), Mul()), Mul(b, d)); 
-                        default: ;
+                        Div(c, d): Div(Add(Mul(a, d), Mul(c, b)), Mul(b, d)); 
+                        default: Div(Add(a, Mul(b, right)), b);
                     }
                 };
 
