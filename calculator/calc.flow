@@ -3,7 +3,7 @@ import lingo/pegcode/driver;
 
 Rational(num: int, denom: int);
 
-simplify(value: Rational) -> Rational {
+simplifyRational(value: Rational) -> Rational {
     div = gcd(value.num, value.denom);
     new = Rational(value.num / div, value.denom / div);
     if (new.denom > 0) {
@@ -22,7 +22,7 @@ Expr ::= Add, Sub, Mul, Div, Neg, Int, Var;
     Sub(lhs: Expr, rhs: Expr);
     Mul(lhs: Expr, rhs: Expr);
     Div(lhs: Expr, rhs: Expr);
-    Neg(value: Expr);
+    Neg(expr: Expr);
     Int(value: int);
     Var(name: string);
     
@@ -100,11 +100,82 @@ differentiate(expr: Expr, var: string) -> Expr {
     }
 }
 
+simplifyExpression(expr: Expr) -> Expr {
+    simplify = \e -> simplifyExpression(e);
+
+    switch (expr) {
+        Add(lhs, rhs): {
+            left = simplify(lhs);
+            right = simplify(rhs);
+
+            if (left == Int(0)) {
+                right
+            } else if (right == Int(0)) {
+                left
+            } else {
+                Add(left, right)
+            }
+        }
+
+        Sub(lhs, rhs): {
+            left = simplify(lhs);
+            right = simplify(rhs);
+
+            if (left == Int(0)) {
+                simplify(Neg(left))
+            } else if (right == Int(0)) {
+                left
+            } else {
+                Sub(left, right)
+            }
+        }
+
+        Mul(lhs, rhs): {
+            left = simplify(lhs);
+            right = simplify(rhs);
+
+            if (left == Int(0) || right == Int(0)) {
+                Int(0)
+            } else if (left == Int(1)) {
+                right
+            } else if (right == Int(1)) {
+                left
+            } else {
+                Mul(left, right)
+            }
+        }
+
+        Div(lhs, rhs): {
+            left = simplify(lhs);
+            right = simplify(rhs);
+
+            if (left == Int(0)) {
+                Int(0)
+            } else if (right == Int(1)) {
+                left
+            } else {
+                Div(left, right)
+            }
+        }
+
+        Neg(value): {
+            switch (value) {
+                Neg(inner): simplify(inner);
+                Int(number): if (number == 0) { Int(0) } else { Neg(Int(number)) };
+                default: Neg(simplify(value));
+            }
+        }
+
+        Int(value): Int(value);
+        Var(name): Var(name);
+    }
+}
+
 main() {
-    example = "((x * x) * x)";
+    example = "((x * x) * (y * y))";
     expr = s2expr(example);
     derivative = differentiate(expr, "x");
+    simplified = simplifyExpression(derivative);
     println(expr2s(derivative));
-
-    
+    println(expr2s(simplified));
 }
