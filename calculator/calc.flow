@@ -173,8 +173,27 @@ simplifyExpression(expr: Expr) -> Expr {
 
 toRationalForm(expr: Expr) -> Expr {
     switch (expr) {
-        Add(lhs, rhs):
-        Sub(lhs, rhs):
+        Add(lhs, rhs): {
+            left = toRationalForm(lhs);
+            right = toRationalForm(rhs);
+
+            switch (left) {
+                Div(a, b): {
+                    switch (right) {
+                        Div(c, d): Div(Add(Mul(), Mul()), Mul(b, d)); 
+                        default: ;
+                    }
+                };
+
+                default: ;
+            }
+        };
+
+        Sub(lhs, rhs): {
+
+        };
+
+
         Mul(lhs, rhs): {
             left = toRationalForm(lhs);
             right = toRationalForm(rhs);
