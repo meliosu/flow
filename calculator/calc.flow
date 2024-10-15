@@ -86,19 +86,23 @@ expr2r(expr: Expr, variables: Tree<string, Rational>) -> Maybe<Rational> {
     }
 }
 
-main() {
-    vars = fold([
-        Pair("xyz4", Rational(3, 1)),
-        Pair("ab3_c", Rational(3, 2)),
-    ], makeTree(), \tree, p -> setTree(tree, p.first, p.second));
-
-    example = "(((xyz4 + 2) - (5 / 2)) / ((-ab3_c) + (1 / 2)))";
-    expr = s2expr(example);
-    println(expr2s(expr));
-    result = expr2r(expr, vars);
-    
-    switch (result) {
-        Some(rational): println(r2s(simplify(rational)));
-        None(): println("Error");
+differentiate(expr: Expr, var: string) -> Expr {
+    switch (expr) {
+        Add(lhs, rhs): Add(differentiate(lhs, var), differentiate(rhs, var));
+        Sub(lhs, rhs): Sub(differentiate(lhs, var), differentiate(rhs, var));
+        Mul(lhs, rhs): Add(Mul(differentiate(lhs, var), rhs), Mul(lhs, differentiate(rhs, var)));
+        Div(lhs, rhs): Div(Sub(Mul(differentiate(lhs, var), rhs), Mul(lhs, differentiate(rhs, var))), Mul(rhs, rhs));
+        Neg(value): Neg(differentiate(value, var));
+        Int(value): Int(0);
+        Var(name): if (name == var) { Int(1) } else { Int(0) };
     }
+}
+
+main() {
+    example = "((x * x) * x)";
+    expr = s2expr(example);
+    derivative = differentiate(expr, "x");
+    println(expr2s(derivative));
+
+    
 }
