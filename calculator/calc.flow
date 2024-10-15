@@ -187,7 +187,7 @@ toRationalForm(expr: Expr) -> Expr {
 
                 default: {
                     switch (right) {
-                        Div(a, b): Div(Add(Mul(b, left), a), b); 
+                        Div(a, b): Div(Add(Mul(left, b), a), b); 
                         default: Add(left, right);
                     }
                 };
@@ -208,7 +208,7 @@ toRationalForm(expr: Expr) -> Expr {
 
                 default: {
                     switch (right) {
-                        Div(a, b): Div(Sub(Mul(b, left), a), b); 
+                        Div(a, b): Div(Sub(Mul(left, b), a), b); 
                         default: Sub(left, right);
                     }
                 };
