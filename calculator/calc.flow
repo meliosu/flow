@@ -185,12 +185,34 @@ toRationalForm(expr: Expr) -> Expr {
                     }
                 };
 
-                default: ;
+                default: {
+                    switch (right) {
+                        Div(a, b): Div(Add(Mul(b, left), a), b); 
+                        default: Add(left, right);
+                    }
+                };
             }
         };
 
         Sub(lhs, rhs): {
+            left = toRationalForm(lhs);
+            right = toRationalForm(rhs);
 
+            switch (left) {
+                Div(a, b): {
+                    switch (right) {
+                        Div(c, d): Div(Sub(Mul(a, d), Mul(c, b)), Mul(b, d)); 
+                        default: Div(Sub(a, Mul(b, right)), b);
+                    }
+                };
+
+                default: {
+                    switch (right) {
+                        Div(a, b): Div(Sub(Mul(b, left), a), b); 
+                        default: Sub(left, right);
+                    }
+                };
+            }
         };
 
 
@@ -202,16 +224,16 @@ toRationalForm(expr: Expr) -> Expr {
                 Div(a, b): {
                     switch (right) {
                         Div(c, d): Div(Mul(a, c), Mul(b, d));
-                        default: ;
+                        default: Div(Mul(a, right), b);
                     }
                 };
 
                 default: {
                     switch (right) {
-                        Div(a, b): ;
+                        Div(a, b): Div(Mul(left, a), b);
                         default: Mul(left, right);
                     }
-                }
+                };
             }
         };
 
@@ -229,15 +251,15 @@ toRationalForm(expr: Expr) -> Expr {
 
                 default: {
                     switch (right) {
-                        Div(a, b): Div(Mul(b, right), a);
+                        Div(a, b): Div(Mul(left, b), a);
                         default: Div(left, right);
                     }
                 };
             }
         }
 
-        Neg(expr): {
-            e = toRationalForm(expr);
+        Neg(inner): {
+            e = toRationalForm(inner);
 
             switch (e) {
                 Div(a, b): Div(Neg(a), b);
@@ -251,10 +273,8 @@ toRationalForm(expr: Expr) -> Expr {
 }
 
 main() {
-    example = "((x * x) * (y * y))";
+    example = "(-( ((x - 1) / (x - 2)) * (1 / ((x - 1) / (x - 3))) ))";
     expr = s2expr(example);
-    derivative = differentiate(expr, "x");
-    simplified = simplifyExpression(derivative);
-    println(expr2s(derivative));
+    simplified = toRationalForm(expr);
     println(expr2s(simplified));
 }
