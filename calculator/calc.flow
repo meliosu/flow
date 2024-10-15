@@ -87,12 +87,14 @@ expr2r(expr: Expr, variables: Tree<string, Rational>) -> Maybe<Rational> {
 }
 
 differentiate(expr: Expr, var: string) -> Expr {
+    diff = \e -> differentiate(e, var);
+    
     switch (expr) {
-        Add(lhs, rhs): Add(differentiate(lhs, var), differentiate(rhs, var));
-        Sub(lhs, rhs): Sub(differentiate(lhs, var), differentiate(rhs, var));
-        Mul(lhs, rhs): Add(Mul(differentiate(lhs, var), rhs), Mul(lhs, differentiate(rhs, var)));
-        Div(lhs, rhs): Div(Sub(Mul(differentiate(lhs, var), rhs), Mul(lhs, differentiate(rhs, var))), Mul(rhs, rhs));
-        Neg(value): Neg(differentiate(value, var));
+        Add(lhs, rhs): Add(diff(lhs), diff(rhs));
+        Sub(lhs, rhs): Sub(diff(lhs), diff(rhs));
+        Mul(lhs, rhs): Add(Mul(diff(lhs), rhs), Mul(lhs, diff(rhs)));
+        Div(lhs, rhs): Div(Sub(Mul(diff(lhs), rhs), Mul(lhs, diff(rhs))), Mul(rhs, rhs));
+        Neg(value): Neg(diff(value));
         Int(value): Int(0);
         Var(name): if (name == var) { Int(1) } else { Int(0) };
     }
