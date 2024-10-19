@@ -10,6 +10,10 @@ Expr ::= Add, Sub, Mul, Div, Neg, Int, Var;
     Int(value: int);
     Var(name: string);
 
+PTerm(vars: Tree<string, int> /* key = variable name, value = exponent */ );
+
+Polynom(terms: Tree<PTerm, int> /* key = term, value = integer coefficient */ );
+
 s2expr(str: string) -> Expr {
     grammar = compilePegGrammar("#include grammar.lingo");
     parsic(grammar, str, defaultPegActions);
@@ -27,8 +31,6 @@ expr2s(expr: Expr) -> string {
     }
 }
 
-PTerm(vars: Tree<string, int> /* key = variable name, value = exponent */ );
-
 mulTerms(lhs: PTerm, rhs: PTerm) -> PTerm {
     PTerm(
         mergeTreeCustom(
@@ -36,8 +38,6 @@ mulTerms(lhs: PTerm, rhs: PTerm) -> PTerm {
         )
     )
 }
-
-Polynom(terms: Tree<PTerm, int> /* key = term, value = integer coefficient */ );
 
 negPolynom(polynom: Polynom) -> Polynom {
     Polynom(
@@ -53,7 +53,6 @@ addPolynoms(lhs: Polynom, rhs: Polynom) -> Polynom {
             mergeTreeCustom(
                 lhs.terms, rhs.terms, \_, c1, c2 -> c1 + c2
             ),
-
             \term, coeff -> coeff != 0
         )
     )
@@ -92,15 +91,15 @@ polynom2s(polynom: Polynom) -> string {
                 term.vars,
                 "",
                 \var, exp, s -> {
-                    if (exp == 1) {
-                        s + var
+                    s + if (exp == 1) {
+                        var
                     } else {
-                        s + var + "^" + i2s(exp)
+                        var + "^" + i2s(exp)
                     }
                 }
             );
 
-            if (result == "") {
+            result + if (result == "") {
                 if (coeff == 1) {
                     term_s
                 } else if (coeff == -1) {
@@ -110,13 +109,13 @@ polynom2s(polynom: Polynom) -> string {
                 }
             } else {
                 if (coeff == 1) {
-                    result + " + " + term_s
+                    " + " + term_s
                 } else if (coeff == -1) {
-                    result + " - " + term_s
+                    " - " + term_s
                 } else if (coeff > 0) {
-                    result + " + " + i2s(coeff) + term_s
+                    " + " + i2s(coeff) + term_s
                 } else {
-                    result + " - " + i2s(-coeff) + term_s
+                    " - " + i2s(-coeff) + term_s
                 }
             }
         }
@@ -142,121 +141,45 @@ expr2polynom(expr: Expr) -> Polynom {
     }
 }
 
-toRationalForm(expr: Expr) -> Expr {
+toRationalForm(expr: Expr) -> Div {
     switch (expr) {
         Add(lhs, rhs): {
             left = toRationalForm(lhs);
             right = toRationalForm(rhs);
-
-            switch (left) {
-                Div(a, b): {
-                    switch (right) {
-                        Div(c, d): Div(Add(Mul(a, d), Mul(c, b)), Mul(b, d)); 
-                        default: Div(Add(a, Mul(b, right)), b);
-                    }
-                };
-
-                default: {
-                    switch (right) {
-                        Div(a, b): Div(Add(Mul(left, b), a), b); 
-                        default: Add(left, right);
-                    }
-                };
-            }
-        };
+            Div(Add(Mul(left.lhs, right.rhs), Mul(left.rhs, right.lhs)), Mul(left.rhs, right.rhs))
+        }
 
         Sub(lhs, rhs): {
             left = toRationalForm(lhs);
             right = toRationalForm(rhs);
-
-            switch (left) {
-                Div(a, b): {
-                    switch (right) {
-                        Div(c, d): Div(Sub(Mul(a, d), Mul(c, b)), Mul(b, d)); 
-                        default: Div(Sub(a, Mul(b, right)), b);
-                    }
-                };
-
-                default: {
-                    switch (right) {
-                        Div(a, b): Div(Sub(Mul(left, b), a), b); 
-                        default: Sub(left, right);
-                    }
-                };
-            }
-        };
+            Div(Sub(Mul(left.lhs, right.rhs), Mul(left.rhs, right.lhs)), Mul(left.rhs, right.rhs))
+        }
 
         Mul(lhs, rhs): {
             left = toRationalForm(lhs);
             right = toRationalForm(rhs);
-
-            switch (left) {
-                Div(a, b): {
-                    switch (right) {
-                        Div(c, d): Div(Mul(a, c), Mul(b, d));
-                        default: Div(Mul(a, right), b);
-                    }
-                };
-
-                default: {
-                    switch (right) {
-                        Div(a, b): Div(Mul(left, a), b);
-                        default: Mul(left, right);
-                    }
-                };
-            }
-        };
+            Div(Mul(left.lhs, right.lhs), Mul(left.rhs, right.rhs))
+        }
 
         Div(lhs, rhs): {
             left = toRationalForm(lhs);
             right = toRationalForm(rhs);
-
-            switch (left) {
-                Div(a, b): {
-                    switch (right) {
-                        Div(c, d): Div(Mul(a, d), Mul(b, c));
-                        default: Div(a, Mul(b, right));
-                    }
-                };
-
-                default: {
-                    switch (right) {
-                        Div(a, b): Div(Mul(left, b), a);
-                        default: Div(left, right);
-                    }
-                };
-            }
+            Div(Mul(left.lhs, right.rhs), Mul(left.rhs, right.lhs))
         }
 
         Neg(inner): {
-            e = toRationalForm(inner);
-
-            switch (e) {
-                Div(a, b): Div(Neg(a), b);
-                default: Neg(e);
-            }
-        };
+            r = toRationalForm(inner);
+            Div(Neg(r.lhs), r.rhs)
+        }
 
         Int(value): Div(Int(value), Int(1));
         Var(name): Div(Var(name), Int(1));
     }
 }
 
-
-
 main() {
     example = "(((y * (x + y)) * ((x - 1) / (1 / y))) * ((z + 1) / (z + 2)))";
     expr = s2expr(example);
     rational = toRationalForm(expr);
-
-    switch (rational) {
-        Div(num, denom): {
-            num_polynom = expr2polynom(num);
-            denom_polynom = expr2polynom(denom);
-
-            println("(" + polynom2s(num_polynom) + ") / (" + polynom2s(denom_polynom) + ")");
-        };
-
-        default: println("Error");
-    }
+    println("(" + polynom2s(expr2polynom(rational.lhs)) + ") / (" + polynom2s(expr2polynom(rational.rhs)) + ")");
 }
