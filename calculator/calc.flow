@@ -1,8 +1,6 @@
 import runtime;
 import lingo/pegcode/driver;
 
-Rational(num: int, denom: int);
-
 Expr ::= Add, Sub, Mul, Div, Neg, Int, Var;
     Add(lhs: Expr, rhs: Expr);
     Sub(lhs: Expr, rhs: Expr);
