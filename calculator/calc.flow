@@ -51,8 +51,12 @@ negPolynom(polynom: Polynom) -> Polynom {
 
 addPolynoms(lhs: Polynom, rhs: Polynom) -> Polynom {
     Polynom(
-        mergeTreeCustom(
-            lhs.terms, rhs.terms, \_, c1, c2 -> c1 + c2
+        filterTree(
+            mergeTreeCustom(
+                lhs.terms, rhs.terms, \_, c1, c2 -> c1 + c2
+            ),
+
+            \term, coeff -> coeff != 0
         )
     )
 }
@@ -90,12 +94,10 @@ polynom2s(polynom: Polynom) -> string {
                 term.vars,
                 "",
                 \var, exp, s -> {
-                    if (var == "") {
-                        s
-                    } else if (exp == 1) {
+                    if (exp == 1) {
                         s + var
                     } else {
-                        s + var + "^" + i2s(exp) 
+                        s + var + "^" + i2s(exp)
                     }
                 }
             );
@@ -131,8 +133,8 @@ expr2polynom(expr: Expr) -> Polynom {
         Div(lhs, rhs): Polynom(makeTree()); 
         Neg(inner): negPolynom(expr2polynom(inner));
         Int(value): {
-            term = PTerm(setTree(makeTree(), "", 0));
-            Polynom(setTree(makeTree(), term, 1))
+            term = PTerm(makeTree());
+            Polynom(setTree(makeTree(), term, value))
         }
 
         Var(name): {
@@ -245,7 +247,7 @@ toRationalForm(expr: Expr) -> Expr {
 
 
 main() {
-    example = "(-( ((x - 1) / (x - 2)) * (1 / ((x - 1) / (x - 3))) ))";
+    example = "(((y * (x + y)) * ((x - 1) / (1 / y))) * ((z + 1) / (z + 2)))";
     expr = s2expr(example);
     rational = toRationalForm(expr);
 
@@ -254,7 +256,7 @@ main() {
             num_polynom = expr2polynom(num);
             denom_polynom = expr2polynom(denom);
 
-            println(polynom2s(num_polynom) + " / " + polynom2s(denom_polynom));
+            println("(" + polynom2s(num_polynom) + ") / (" + polynom2s(denom_polynom) + ")");
         };
 
         default: println("Error");
