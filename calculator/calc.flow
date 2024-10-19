@@ -11,16 +11,6 @@ Expr ::= Add, Sub, Mul, Div, Neg, Int, Var;
     Int(value: int);
     Var(name: string);
 
-// switch (expr) {
-//     Add(lhs, rhs):
-//     Sub(lhs, rhs):
-//     Mul(lhs, rhs):
-//     Div(lhs, rhs):
-//     Neg(inner):
-//     Int(value):
-//     Var(name):
-// }
-
 MatchRule(before: Expr, after: Expr);
 
 s2expr(str: string) -> Expr {
@@ -267,16 +257,17 @@ transformExpression(expr: Expr, rules: [MatchRule]) -> Set<Expr> {
 }
 
 main() {
-    example = "(x + 0)";
+    example = "((x * 1) * (y + (z + 0)))";
     expr = s2expr(example);
 
     rules = map(
         [
-            "(x + 0)=x",
-            "(x * 1)=x",
-            "(x * 0)=0",
-            "(x / 1)=x",
-            "(2 + 2)=4",
+            "(x + 0) = x",
+            "(x * 1) = x",
+            "(x * 0) = 0",
+            "(x / 1) = x",
+            "(2 + 2) = 4",
+            "(a * (b + c))=((a * b) + (a * c))"
         ],
         s2rule
     );
