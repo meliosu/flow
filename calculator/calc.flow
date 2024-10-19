@@ -1,5 +1,6 @@
 import runtime;
 import lingo/pegcode/driver;
+import ds/arrayutils;
 
 Expr ::= Add, Sub, Mul, Div, Neg, Int, Var;
     Add(lhs: Expr, rhs: Expr);
@@ -20,7 +21,7 @@ Expr ::= Add, Sub, Mul, Div, Neg, Int, Var;
 //     Var(name):
 // }
 
-Rule(before: Expr, after: Expr);
+MatchRule(before: Expr, after: Expr);
 
 s2expr(str: string) -> Expr {
     grammar = compilePegGrammar("#include grammar.lingo");
@@ -39,13 +40,13 @@ expr2s(expr: Expr) -> string {
     }
 }
 
-s2rule(str: string) -> Rule {
+s2rule(str: string) -> MatchRule {
     exprs = strSplit(str, "=");
-    Rule(s2expr(exprs[0]), s2expr(exprs[1]))
+    MatchRule(s2expr(exprs[0]), s2expr(exprs[1]))
 }
 
 exprEq(first: Expr, second: Expr) -> bool {
-    eq = \e -> exprEq(e);
+    eq = \e1, e2 -> exprEq(e1, e2);
     
     switch (first) {
         Add(lhs1, rhs1): {
@@ -105,7 +106,7 @@ mergeVariableTrees(first: Tree<string, Expr>, second: Tree<string, Expr>) -> May
     foldM(
         variables,
         makeTree(),
-        \tree, pair -> {
+        \tree, pair: Pair<string, Expr> -> {
             switch (lookupTree(tree, pair.first)) {
                 Some(expr): {
                     if (exprEq(expr, pair.second)) {
@@ -199,37 +200,87 @@ captureVariables(expr: Expr, before: Expr) -> Maybe<Tree<string, Expr>> {
     }
 }
 
-applyVariables(after: Expr, vars: Tree<string, int>) -> Maybe<Expr> {
-    switch (expr) {
-        Add(lhs, rhs): maybeMap2(\l, r -> Add(l, r))(applyVariables(lhs), applyVariables(rhs));
-        Sub(lhs, rhs): maybeMap2(\l, r -> Sub(l, r))(applyVariables(lhs), applyVariables(rhs));
-        Mul(lhs, rhs): maybeMap2(\l, r -> Mul(l, r))(applyVariables(lhs), applyVariables(rhs));
-        Div(lhs, rhs): maybeMap2(\l, r -> Add(l, r))(applyVariables(lhs), applyVariables(rhs));
-        Neg(inner): maybeMap(applyVariables(inner), \i -> Neg(i));
+applyVariables(after: Expr, vars: Tree<string, Expr>) -> Maybe<Expr> {
+    apply = \e -> applyVariables(e, vars);
+    
+    switch (after) {
+        Add(lhs, rhs): maybeMap2(\l, r -> Add(l, r))(apply(lhs), apply(rhs));
+        Sub(lhs, rhs): maybeMap2(\l, r -> Sub(l, r))(apply(lhs), apply(rhs));
+        Mul(lhs, rhs): maybeMap2(\l, r -> Mul(l, r))(apply(lhs), apply(rhs));
+        Div(lhs, rhs): maybeMap2(\l, r -> Add(l, r))(apply(lhs), apply(rhs));
+        Neg(inner): maybeMap(apply(inner), \i -> Neg(i));
         Int(value): Some(Int(value));
         Var(name): lookupTree(vars, name);
     }
 }
 
-transformExpression(expr: Expr, rules: [Rule]) -> Set<Expr> {
+captureAndApply(expr: Expr, rule: MatchRule) -> Maybe<Expr> {
+    maybeBind(
+        captureVariables(expr, rule.before),
+        \vars -> applyVariables(rule.after, vars)
+    )
+}
 
+transformBinop(lhs: Expr, rhs: Expr, f: (Expr, Expr) -> Expr, rules: [MatchRule]) -> Set<Expr> {
+    left = transformExpression(lhs, rules);
+    right = transformExpression(rhs, rules);
+
+    foldSet(
+        left,
+        makeSet(),
+        \result, e1 -> {
+            mergeSets(
+                result,
+                mapSet(right, \e2 -> f(e1, e2))
+            )
+        }
+    )
+}
+
+transformExpression(expr: Expr, rules: [MatchRule]) -> Set<Expr> {
+    transform = \e -> transformExpression(expr, rules);
+
+    fold(
+        rules,
+        makeSet(),
+        \set, rule -> {
+            new = switch (expr) {
+                Add(lhs, rhs): transformBinop(lhs, rhs, \a, b -> Add(a, b), rules);
+                Sub(lhs, rhs): transformBinop(lhs, rhs, \a, b -> Sub(a, b), rules);
+                Mul(lhs, rhs): transformBinop(lhs, rhs, \a, b -> Mul(a, b), rules);
+                Div(lhs, rhs): transformBinop(lhs, rhs, \a, b -> Div(a, b), rules);
+                Neg(inner): mapSet(transform(inner), \e -> Neg(e));
+                Int(value): makeSet1(Int(value));
+                Var(name): makeSet1(Var(name));
+            };
+
+            new2 = switch (captureAndApply(expr, rule)) {
+                Some(e): makeSet1(e);
+                None(): makeSet();
+            };
+
+            new3 = makeSet1(expr);
+
+            mergeSetsA([new, new2, new3])
+        }
+    )
 }
 
 main() {
-    example = "(((y * (x + y)) * ((x - 1) / (1 / y))) * ((z + 1) / (z + 2)))";
+    example = "(x + 0)";
     expr = s2expr(example);
 
     rules = map(
         [
-            "(x + 0) = x",
-            "(x * 1) = x",
-            "(x * 0) = 0",
-            "(x / 1) = x",
-            "(2 + 2) = 4",
+            "(x + 0)=x",
+            "(x * 1)=x",
+            "(x * 0)=0",
+            "(x / 1)=x",
+            "(2 + 2)=4",
         ],
         s2rule
     );
 
     transformed = transformExpression(expr, rules);
-    iteri(set2array(transformed), \idx, expr -> println(i2s(idx + 1) + ". " + expr2s(expr)));
+    iteri(set2array(transformed), \idx, e -> println(i2s(idx + 1) + ". " + expr2s(e)));
 }
