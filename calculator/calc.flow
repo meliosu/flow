@@ -3,20 +3,6 @@ import lingo/pegcode/driver;
 
 Rational(num: int, denom: int);
 
-simplifyRational(value: Rational) -> Rational {
-    div = gcd(value.num, value.denom);
-    new = Rational(value.num / div, value.denom / div);
-    if (new.denom > 0) {
-        new
-    } else {
-        Rational(-new.num, -new.denom)
-    }
-}
-
-r2s(rational: Rational) -> string {
-    i2s(rational.num) + "/" + i2s(rational.denom)
-}
-
 Expr ::= Add, Sub, Mul, Div, Neg, Int, Var;
     Add(lhs: Expr, rhs: Expr);
     Sub(lhs: Expr, rhs: Expr);
@@ -25,7 +11,7 @@ Expr ::= Add, Sub, Mul, Div, Neg, Int, Var;
     Neg(expr: Expr);
     Int(value: int);
     Var(name: string);
-    
+
 s2expr(str: string) -> Expr {
     grammar = compilePegGrammar("#include grammar.lingo");
     parsic(grammar, str, defaultPegActions);
@@ -43,132 +29,80 @@ expr2s(expr: Expr) -> string {
     }
 }
 
-maybeAdd(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
-    maybeMap2(\left, right -> {
-        denom = lcm(left.denom, right.denom);
-        Rational(left.num * (denom / left.denom) + right.num * (denom / right.denom), denom)
-    })(lhs, rhs)
+Term(vars: Tree<string, int> /* key = variable name, value = exponent */ );
+
+mulTerms(lhs: Term, rhs: Term) -> Term {
+    Term(
+        mergeTreeCustom(
+            lhs.vars, rhs.vars, \_, e1, e2 -> e1 + e2
+        )
+    )
 }
 
-maybeSub(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
-    maybeAdd(lhs, maybeMap(rhs, \v -> Rational(-v.num, v.denom)))
+Polynom(terms: Tree<Term, int> /* key = term, value = integer coefficient */ );
+
+negPolynom(polynom: Polynom) -> Polynom {
+    Polynom(
+        mapTree(
+            polynom.terms, \coeff -> -coeff,
+        )
+    )
 }
 
-maybeMul(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
-    maybeMap2(\left, right -> {
-        left_m = gcd(left.num, right.denom);
-        right_m = gcd(left.denom, right.num);
-        Rational((left.num / left_m) * (right.num / right_m), (left.denom / left_m) * (right.denom / right_m))
-    })(lhs, rhs)
+addPolynoms(lhs: Polynom, rhs: Polynom) -> Polynom {
+    Polynom(
+        mergeTreeCustom(
+            lhs.terms, rhs.terms, \_, c1, c2 -> c1 + c2
+        )
+    )
 }
 
-maybeDiv(lhs: Maybe<Rational>, rhs: Maybe<Rational>) -> Maybe<Rational> {
-    if (eitherMap(rhs, \r -> r.num == 0, false)) {
-        None();
-    } else {
-        maybeMul(lhs, maybeMap(rhs, \v -> Rational(v.denom, v.num)));
-    }
+subPolynoms(lhs: Polynom, rhs: Polynom) -> Polynom {
+    addPolynoms(lhs, negPolynom(rhs))
 }
 
-maybeNeg(value: Maybe<Rational>) -> Maybe<Rational> {
-    maybeMap(value, \v -> Rational(-v.num, v.denom))
+mulPolynoms(lhs: Polynom, rhs: Polynom) -> Polynom {
+    foldTree(
+        lhs.terms,
+        Polynom(makeTree()),
+        \term, coeff, result -> {
+            mul = Polynom(
+                foldTree(
+                    rhs.terms,
+                    makeTree(),
+                    \t, c, res -> {
+                        setTree(res, mulTerms(term, t), coeff * c)
+                    }
+                )
+            );
+
+            addPolynoms(mul, result)
+        }
+    )
 }
 
-expr2r(expr: Expr, variables: Tree<string, Rational>) -> Maybe<Rational> {
-    switch (expr) {
-        Add(lhs, rhs): maybeAdd(expr2r(lhs, variables), expr2r(rhs, variables));
-        Sub(lhs, rhs): maybeSub(expr2r(lhs, variables), expr2r(rhs, variables));
-        Mul(lhs, rhs): maybeMul(expr2r(lhs, variables), expr2r(rhs, variables));
-        Div(lhs, rhs): maybeDiv(expr2r(lhs, variables), expr2r(rhs, variables));
-        Neg(value): maybeNeg(expr2r(value, variables));
-        Int(value): Some(Rational(value, 1));
-        Var(name): lookupTree(variables, name);
-    }
-}
+polynom2s(polynom: Polynom) -> string {
+    foldTree(
+        polynom.terms,
+        "",
+        \term, coeff, result -> {
+            term_s = foldTree(
+                term.vars,
+                "",
+                \var, exp, s -> s + var + "^" + i2s(exp) 
+            );
 
-differentiate(expr: Expr, var: string) -> Expr {
-    diff = \e -> differentiate(e, var);
-    
-    switch (expr) {
-        Add(lhs, rhs): Add(diff(lhs), diff(rhs));
-        Sub(lhs, rhs): Sub(diff(lhs), diff(rhs));
-        Mul(lhs, rhs): Add(Mul(diff(lhs), rhs), Mul(lhs, diff(rhs)));
-        Div(lhs, rhs): Div(Sub(Mul(diff(lhs), rhs), Mul(lhs, diff(rhs))), Mul(rhs, rhs));
-        Neg(value): Neg(diff(value));
-        Int(value): Int(0);
-        Var(name): if (name == var) { Int(1) } else { Int(0) };
-    }
-}
-
-simplifyExpression(expr: Expr) -> Expr {
-    simplify = \e -> simplifyExpression(e);
-
-    switch (expr) {
-        Add(lhs, rhs): {
-            left = simplify(lhs);
-            right = simplify(rhs);
-
-            if (left == Int(0)) {
-                right
-            } else if (right == Int(0)) {
-                left
+            if (result == "") {
+                i2s(coeff) + term_s
             } else {
-                Add(left, right)
+                if (coeff > 0) {
+                    result + " + " + i2s(coeff) + term_s
+                } else {
+                    result + " - " + i2s(-coeff) + term_s
+                }
             }
         }
-
-        Sub(lhs, rhs): {
-            left = simplify(lhs);
-            right = simplify(rhs);
-
-            if (left == Int(0)) {
-                simplify(Neg(left))
-            } else if (right == Int(0)) {
-                left
-            } else {
-                Sub(left, right)
-            }
-        }
-
-        Mul(lhs, rhs): {
-            left = simplify(lhs);
-            right = simplify(rhs);
-
-            if (left == Int(0) || right == Int(0)) {
-                Int(0)
-            } else if (left == Int(1)) {
-                right
-            } else if (right == Int(1)) {
-                left
-            } else {
-                Mul(left, right)
-            }
-        }
-
-        Div(lhs, rhs): {
-            left = simplify(lhs);
-            right = simplify(rhs);
-
-            if (left == Int(0)) {
-                Int(0)
-            } else if (right == Int(1)) {
-                left
-            } else {
-                Div(left, right)
-            }
-        }
-
-        Neg(value): {
-            switch (value) {
-                Neg(inner): simplify(inner);
-                Int(number): if (number == 0) { Int(0) } else { Neg(Int(number)) };
-                default: Neg(simplify(value));
-            }
-        }
-
-        Int(value): Int(value);
-        Var(name): Var(name);
-    }
+    )
 }
 
 toRationalForm(expr: Expr) -> Expr {
@@ -214,7 +148,6 @@ toRationalForm(expr: Expr) -> Expr {
                 };
             }
         };
-
 
         Mul(lhs, rhs): {
             left = toRationalForm(lhs);
@@ -267,14 +200,15 @@ toRationalForm(expr: Expr) -> Expr {
             }
         };
 
-        Int(value): Int(value);
-        Var(name): Var(name);
+        Int(value): Div(Int(value), Int(1));
+        Var(name): Div(Var(name), Int(1));
     }
 }
 
 main() {
     example = "(-( ((x - 1) / (x - 2)) * (1 / ((x - 1) / (x - 3))) ))";
     expr = s2expr(example);
-    simplified = toRationalForm(expr);
+    rational = toRationalForm(expr);
+    simplified = simplifyExpression(rational);
     println(expr2s(simplified));
 }
