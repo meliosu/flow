@@ -261,7 +261,7 @@ transformExpression(expr: Expr, rules: [MatchRule]) -> Set<Expr> {
 
             new3 = makeSet1(expr);
 
-            mergeSetsA([new, new2, new3])
+            mergeSetsA([set, new, new2, new3])
         }
     )
 }
