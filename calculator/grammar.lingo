@@ -3,10 +3,10 @@ S = int | add | sub | neg | mul | div | var;
 ws = (' ' | '\t' | '\n' | '\r')*;
 digit = '0'-'9';
 
-int = digit+$s { Int(s2i($s)) };
-add = "(" ws S:l ws "+" ws S:r ws ")" { Add(:l, :r) };
-sub = "(" ws S:l ws "-" ws S:r ws ")" { Sub(:l, :r) };
-mul = "(" ws S:l ws "*" ws S:r ws ")" { Mul(:l, :r) };
-div = "(" ws S:l ws "/" ws S:r ws ")" { Div(:l, :r) };
-neg = "(" ws "-" ws S:v ws ")" { Neg(:v) };
-var = (('a'-'z' | '_') ('a'-'z' | '0'-'9' | '_')*)$name { Var($name) };
+int = ws digit+$s ws { Int(s2i($s)) };
+add = ws "(" ws S:l ws "+" ws S:r ws ")" ws { Add(:l, :r) };
+sub = ws "(" ws S:l ws "-" ws S:r ws ")" ws { Sub(:l, :r) };
+mul = ws "(" ws S:l ws "*" ws S:r ws ")" ws { Mul(:l, :r) };
+div = ws "(" ws S:l ws "/" ws S:r ws ")" ws { Div(:l, :r) };
+neg = ws "(" ws "-" ws S:v ws ")" ws { Neg(:v) };
+var = ws (('a'-'z' | '_') ('a'-'z' | '0'-'9' | '_')*)$name ws { Var($name) };
