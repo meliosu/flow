@@ -29,17 +29,17 @@ expr2s(expr: Expr) -> string {
     }
 }
 
-Term(vars: Tree<string, int> /* key = variable name, value = exponent */ );
+PTerm(vars: Tree<string, int> /* key = variable name, value = exponent */ );
 
-mulTerms(lhs: Term, rhs: Term) -> Term {
-    Term(
+mulTerms(lhs: PTerm, rhs: PTerm) -> PTerm {
+    PTerm(
         mergeTreeCustom(
             lhs.vars, rhs.vars, \_, e1, e2 -> e1 + e2
         )
     )
 }
 
-Polynom(terms: Tree<Term, int> /* key = term, value = integer coefficient */ );
+Polynom(terms: Tree<PTerm, int> /* key = term, value = integer coefficient */ );
 
 negPolynom(polynom: Polynom) -> Polynom {
     Polynom(
@@ -89,13 +89,31 @@ polynom2s(polynom: Polynom) -> string {
             term_s = foldTree(
                 term.vars,
                 "",
-                \var, exp, s -> s + var + "^" + i2s(exp) 
+                \var, exp, s -> {
+                    if (var == "") {
+                        s
+                    } else if (exp == 1) {
+                        s + var
+                    } else {
+                        s + var + "^" + i2s(exp) 
+                    }
+                }
             );
 
             if (result == "") {
-                i2s(coeff) + term_s
+                if (coeff == 1) {
+                    term_s
+                } else if (coeff == -1) {
+                    "-" + term_s
+                } else {
+                    i2s(coeff) + term_s
+                }
             } else {
-                if (coeff > 0) {
+                if (coeff == 1) {
+                    result + " + " + term_s
+                } else if (coeff == -1) {
+                    result + " - " + term_s
+                } else if (coeff > 0) {
                     result + " + " + i2s(coeff) + term_s
                 } else {
                     result + " - " + i2s(-coeff) + term_s
@@ -103,6 +121,25 @@ polynom2s(polynom: Polynom) -> string {
             }
         }
     )
+}
+
+expr2polynom(expr: Expr) -> Polynom {
+    switch (expr) {
+        Add(lhs, rhs): addPolynoms(expr2polynom(lhs), expr2polynom(rhs));
+        Sub(lhs, rhs): subPolynoms(expr2polynom(lhs), expr2polynom(rhs));
+        Mul(lhs, rhs): mulPolynoms(expr2polynom(lhs), expr2polynom(rhs));
+        Div(lhs, rhs): Polynom(makeTree()); 
+        Neg(inner): negPolynom(expr2polynom(inner));
+        Int(value): {
+            term = PTerm(setTree(makeTree(), "", 0));
+            Polynom(setTree(makeTree(), term, 1))
+        }
+
+        Var(name): {
+            term = PTerm(setTree(makeTree(), name, 1));
+            Polynom(setTree(makeTree(), term, 1))
+        }
+    }
 }
 
 toRationalForm(expr: Expr) -> Expr {
@@ -205,10 +242,21 @@ toRationalForm(expr: Expr) -> Expr {
     }
 }
 
+
+
 main() {
     example = "(-( ((x - 1) / (x - 2)) * (1 / ((x - 1) / (x - 3))) ))";
     expr = s2expr(example);
     rational = toRationalForm(expr);
-    simplified = simplifyExpression(rational);
-    println(expr2s(simplified));
+
+    switch (rational) {
+        Div(num, denom): {
+            num_polynom = expr2polynom(num);
+            denom_polynom = expr2polynom(denom);
+
+            println(polynom2s(num_polynom) + " / " + polynom2s(denom_polynom));
+        };
+
+        default: println("Error");
+    }
 }
