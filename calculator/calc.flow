@@ -197,7 +197,7 @@ applyVariables(after: Expr, vars: Tree<string, Expr>) -> Maybe<Expr> {
         Add(lhs, rhs): maybeMap2(\l, r -> Add(l, r))(apply(lhs), apply(rhs));
         Sub(lhs, rhs): maybeMap2(\l, r -> Sub(l, r))(apply(lhs), apply(rhs));
         Mul(lhs, rhs): maybeMap2(\l, r -> Mul(l, r))(apply(lhs), apply(rhs));
-        Div(lhs, rhs): maybeMap2(\l, r -> Add(l, r))(apply(lhs), apply(rhs));
+        Div(lhs, rhs): maybeMap2(\l, r -> Div(l, r))(apply(lhs), apply(rhs));
         Neg(inner): maybeMap(apply(inner), \i -> Neg(i));
         Int(value): Some(Int(value));
         Var(name): lookupTree(vars, name);
@@ -251,13 +251,24 @@ transformExpression(expr: Expr, rules: [MatchRule]) -> Set<Expr> {
 
             new3 = makeSet1(expr);
 
-            mergeSetsA([set, new, new2, new3])
+            new4 = foldSet(
+                new,
+                makeSet(),
+                \s, e -> {
+                    switch (captureAndApply(e, rule)) {
+                        Some(new_expr): insertSet(s, new_expr);
+                        None(): s;
+                    }
+                }
+            );
+
+            mergeSetsA([set, new, new2, new3, new4])
         }
     )
 }
 
 main() {
-    example = "((x * 1) * (y + (z + 0)))";
+    example = "((x * (a / a)) * (y + (z + 0)))";
     expr = s2expr(example);
 
     rules = map(
@@ -267,7 +278,8 @@ main() {
             "(x * 0) = 0",
             "(x / 1) = x",
             "(2 + 2) = 4",
-            "(a * (b + c))=((a * b) + (a * c))"
+            "(z / z) = 1",
+            "(a * (b + c)) = ((a * b) + (a * c))",
         ],
         s2rule
     );
