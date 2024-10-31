@@ -229,30 +229,24 @@ transformBinop(lhs: Expr, rhs: Expr, f: (Expr, Expr) -> Expr, rules: [MatchRule]
 
 transformExpression(expr: Expr, rules: [MatchRule]) -> Set<Expr> {
     transform = \e -> transformExpression(expr, rules);
+    binop = \l, r, f -> transformBinop(l, r, f, rules);
 
-    fold(
+    new1 = switch (expr) {
+        Add(lhs, rhs): binop(lhs, rhs, \a, b -> Add(a, b));
+        Sub(lhs, rhs): binop(lhs, rhs, \a, b -> Sub(a, b));
+        Mul(lhs, rhs): binop(lhs, rhs, \a, b -> Mul(a, b));
+        Div(lhs, rhs): binop(lhs, rhs, \a, b -> Div(a, b));
+        Neg(inner): mapSet(transform(inner), \e -> Neg(e));
+        Int(value): makeSet1(Int(value));
+        Var(name): makeSet1(Var(name));
+    };
+
+    new2 = fold(
         rules,
         makeSet(),
         \set, rule -> {
-            new = switch (expr) {
-                Add(lhs, rhs): transformBinop(lhs, rhs, \a, b -> Add(a, b), rules);
-                Sub(lhs, rhs): transformBinop(lhs, rhs, \a, b -> Sub(a, b), rules);
-                Mul(lhs, rhs): transformBinop(lhs, rhs, \a, b -> Mul(a, b), rules);
-                Div(lhs, rhs): transformBinop(lhs, rhs, \a, b -> Div(a, b), rules);
-                Neg(inner): mapSet(transform(inner), \e -> Neg(e));
-                Int(value): makeSet1(Int(value));
-                Var(name): makeSet1(Var(name));
-            };
-
-            new2 = switch (captureAndApply(expr, rule)) {
-                Some(e): makeSet1(e);
-                None(): makeSet();
-            };
-
-            new3 = makeSet1(expr);
-
-            new4 = foldSet(
-                new,
+            mergeSets(foldSet(
+                new1,
                 makeSet(),
                 \s, e -> {
                     switch (captureAndApply(e, rule)) {
@@ -260,15 +254,15 @@ transformExpression(expr: Expr, rules: [MatchRule]) -> Set<Expr> {
                         None(): s;
                     }
                 }
-            );
-
-            mergeSetsA([set, new, new2, new3, new4])
+            ), set)
         }
-    )
+    );
+
+    mergeSetsA([new1, new2, makeSet1(expr)])
 }
 
 main() {
-    example = "((x * (a / a)) * (y + (z + 0)))";
+    example = "((x * (a / a)) * (y + (z + ((2 + 2) - 4))))";
     expr = s2expr(example);
 
     rules = map(
@@ -280,6 +274,7 @@ main() {
             "(2 + 2) = 4",
             "(z / z) = 1",
             "(a * (b + c)) = ((a * b) + (a * c))",
+            "(x - x) = 0",
         ],
         s2rule
     );
