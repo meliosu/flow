@@ -35,6 +35,20 @@ s2rule(str: string) -> MatchRule {
     MatchRule(s2expr(exprs[0]), s2expr(exprs[1]))
 }
 
+exprDepth(expr: Expr) -> int {
+    binop = \l, r -> max(exprDepth(l), exprDepth(r));
+    
+    1 + switch (expr) {
+        Add(lhs, rhs): binop(lhs, rhs);
+        Sub(lhs, rhs): binop(lhs, rhs);
+        Mul(lhs, rhs): binop(lhs, rhs);
+        Div(lhs, rhs): binop(lhs, rhs);
+        Neg(inner): exprDepth(inner);
+        Int(value): 0;
+        Var(name): 0;
+    }
+}
+
 applyRule(expr: Expr, rule: MatchRule) -> Maybe<Expr> {
     if (expr == rule.before) {
         Some(rule.after)
@@ -96,6 +110,14 @@ transformExpression(expr: Expr, rules: [MatchRule]) -> Set<Expr> {
     mergeSets(new1, new2)
 }
 
+pickBest(expressions: Set<Expr>) -> Expr {
+    sortCustom(
+        set2array(expressions),
+        \e -> exprDepth(e),
+        true
+    )[0]
+}
+
 main() {
     example = "((x + (2 / q)) + ((1 + 1) + (7 * (w + 1))))";
     expr = s2expr(example);
@@ -112,4 +134,5 @@ main() {
 
     transformed = transformExpression(expr, rules);
     iteri(set2array(transformed), \idx, e -> println(i2s(idx + 1) + ". " + expr2s(e)));
+    println("\nMost simplified:\n" + expr2s(pickBest(transformed)));
 }
