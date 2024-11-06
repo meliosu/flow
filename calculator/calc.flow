@@ -35,208 +35,40 @@ s2rule(str: string) -> MatchRule {
     MatchRule(s2expr(exprs[0]), s2expr(exprs[1]))
 }
 
-exprEq(first: Expr, second: Expr) -> bool {
-    eq = \e1, e2 -> exprEq(e1, e2);
-    
-    switch (first) {
-        Add(lhs1, rhs1): {
-            switch (second) {
-                Add(lhs2, rhs2): eq(lhs1, lhs2) && eq(rhs1, rhs2);
-                default: false;
-            }
-        }
-
-        Sub(lhs1, rhs1): {
-            switch (second) {
-                Add(lhs2, rhs2): eq(lhs1, lhs2) && eq(rhs1, rhs2);
-                default: false;
-            }
-        }
-
-        Mul(lhs1, rhs1): {
-            switch (second) {
-                Add(lhs2, rhs2): eq(lhs1, lhs2) && eq(rhs1, rhs2);
-                default: false;
-            }
-        }
-
-        Div(lhs1, rhs1): {
-            switch (second) {
-                Add(lhs2, rhs2): eq(lhs1, lhs2) && eq(rhs1, rhs2);
-                default: false;
-            }
-        }
-
-        Neg(inner1): {
-            switch (second) {
-                Neg(inner2): eq(inner1, inner2);
-                default: false;
-            }
-        }
-
-        Int(value1): {
-            switch (second) {
-                Int(value2): value1 == value2;
-                default: false;
-            }
-        }
-
-        Var(name1): {
-            switch (second) {
-                Var(name2): name1 == name2;
-                default: false;
-            }
-        }
+applyRule(expr: Expr, rule: MatchRule) -> Maybe<Expr> {
+    if (expr == rule.before) {
+        Some(rule.after)
+    } else {
+        None()
     }
-}
-
-mergeVariableTrees(first: Tree<string, Expr>, second: Tree<string, Expr>) -> Maybe<Tree<string, Expr>> {
-    variables = concat(tree2pairs(first), tree2pairs(second));
-
-    foldM(
-        variables,
-        makeTree(),
-        \tree, pair: Pair<string, Expr> -> {
-            switch (lookupTree(tree, pair.first)) {
-                Some(expr): {
-                    if (exprEq(expr, pair.second)) {
-                        Some(setTree(tree, pair.first, pair.second));
-                    } else {
-                        None();
-                    }
-                }
-
-                None(): Some(setTree(tree, pair.first, pair.second));
-            }
-        }
-    )
-}
-
-captureVariables(expr: Expr, before: Expr) -> Maybe<Tree<string, Expr>> {
-    switch (before) {
-        Var(name): Some(makeTree1(name, expr));
-
-        Add(lhs2, rhs2): {
-            switch (expr) {
-                Add(lhs1, rhs1): {
-                    left = captureVariables(lhs1, lhs2);
-                    right = captureVariables(rhs1, rhs2);
-                    maybeBind2(mergeVariableTrees)(left, right)
-                }
-
-                default: None();
-            }
-        }
-
-        Sub(lhs2, rhs2): {
-            switch (expr) {
-                Sub(lhs1, rhs1): {
-                    left = captureVariables(lhs1, lhs2);
-                    right = captureVariables(rhs1, rhs2);
-                    maybeBind2(mergeVariableTrees)(left, right)
-                }
-
-                default: None();
-            }
-        }
-
-        Mul(lhs2, rhs2): {
-            switch (expr) {
-                Mul(lhs1, rhs1): {
-                    left = captureVariables(lhs1, lhs2);
-                    right = captureVariables(rhs1, rhs2);
-                    maybeBind2(mergeVariableTrees)(left, right)
-                }
-
-                default: None();
-            }
-        }
-
-        Div(lhs2, rhs2): {
-            switch (expr) {
-                Div(lhs1, rhs1): {
-                    left = captureVariables(lhs1, lhs2);
-                    right = captureVariables(rhs1, rhs2);
-                    maybeBind2(mergeVariableTrees)(left, right)
-                }
-
-                default: None();
-            }
-        }
-
-        Neg(inner2): {
-            switch (expr) {
-                Neg(inner1): {
-                    captureVariables(inner1, inner2);
-                }
-
-                default: None();
-            }
-        }
-
-        Int(value2): {
-            switch (expr) {
-                Int(value1): {
-                    if (value1 == value2) {
-                        Some(makeTree());
-                    } else {
-                        None();
-                    }
-                }
-
-                default: None();
-            }
-        }
-    }
-}
-
-applyVariables(after: Expr, vars: Tree<string, Expr>) -> Maybe<Expr> {
-    apply = \e -> applyVariables(e, vars);
-    
-    switch (after) {
-        Add(lhs, rhs): maybeMap2(\l, r -> Add(l, r))(apply(lhs), apply(rhs));
-        Sub(lhs, rhs): maybeMap2(\l, r -> Sub(l, r))(apply(lhs), apply(rhs));
-        Mul(lhs, rhs): maybeMap2(\l, r -> Mul(l, r))(apply(lhs), apply(rhs));
-        Div(lhs, rhs): maybeMap2(\l, r -> Div(l, r))(apply(lhs), apply(rhs));
-        Neg(inner): maybeMap(apply(inner), \i -> Neg(i));
-        Int(value): Some(Int(value));
-        Var(name): lookupTree(vars, name);
-    }
-}
-
-captureAndApply(expr: Expr, rule: MatchRule) -> Maybe<Expr> {
-    maybeBind(
-        captureVariables(expr, rule.before),
-        \vars -> applyVariables(rule.after, vars)
-    )
 }
 
 transformBinop(lhs: Expr, rhs: Expr, f: (Expr, Expr) -> Expr, rules: [MatchRule]) -> Set<Expr> {
-    left = transformExpression(lhs, rules);
-    right = transformExpression(rhs, rules);
+    transformed_lhs = transformExpression(lhs, rules);
+    transformed_rhs = transformExpression(rhs, rules);
 
     foldSet(
-        left,
+        transformed_lhs,
         makeSet(),
-        \result, e1 -> {
+        \set, e1 -> {
             mergeSets(
-                result,
-                mapSet(right, \e2 -> f(e1, e2))
+                set,
+                mapSet(
+                    transformed_rhs,
+                    \e2 -> f(e1, e2)
+                )
             )
-        }
+        } 
     )
 }
 
 transformExpression(expr: Expr, rules: [MatchRule]) -> Set<Expr> {
-    transform = \e -> transformExpression(expr, rules);
-    binop = \l, r, f -> transformBinop(l, r, f, rules);
-
     new1 = switch (expr) {
-        Add(lhs, rhs): binop(lhs, rhs, \a, b -> Add(a, b));
-        Sub(lhs, rhs): binop(lhs, rhs, \a, b -> Sub(a, b));
-        Mul(lhs, rhs): binop(lhs, rhs, \a, b -> Mul(a, b));
-        Div(lhs, rhs): binop(lhs, rhs, \a, b -> Div(a, b));
-        Neg(inner): mapSet(transform(inner), \e -> Neg(e));
+        Add(lhs, rhs): transformBinop(lhs, rhs, \l, r -> Add(l, r), rules);
+        Sub(lhs, rhs): transformBinop(lhs, rhs, \l, r -> Sub(l, r), rules);
+        Mul(lhs, rhs): transformBinop(lhs, rhs, \l, r -> Mul(l, r), rules);
+        Div(lhs, rhs): transformBinop(lhs, rhs, \l, r -> Div(l, r), rules);
+        Neg(inner): mapSet(transformExpression(inner, rules), \e -> Neg(e));
         Int(value): makeSet1(Int(value));
         Var(name): makeSet1(Var(name));
     };
@@ -245,36 +77,35 @@ transformExpression(expr: Expr, rules: [MatchRule]) -> Set<Expr> {
         rules,
         makeSet(),
         \set, rule -> {
-            mergeSets(foldSet(
-                new1,
-                makeSet(),
-                \s, e -> {
-                    switch (captureAndApply(e, rule)) {
-                        Some(new_expr): insertSet(s, new_expr);
-                        None(): s;
+            mergeSets(
+                set,
+                foldSet(
+                    new1,
+                    makeSet(),
+                    \subset, e -> {
+                        switch (applyRule(e, rule)) {
+                            Some(transformed): insertSet(subset, transformed);
+                            None(): subset;
+                        }
                     }
-                }
-            ), set)
+                )
+            )
         }
     );
 
-    mergeSetsA([new1, new2, makeSet1(expr)])
+    mergeSets(new1, new2)
 }
 
 main() {
-    example = "((x * (a / a)) * (y + (z + ((2 + 2) - 4))))";
+    example = "((x + (2 / q)) + ((1 + 1) + (7 * (w + 1))))";
     expr = s2expr(example);
-
     rules = map(
         [
-            "(x + 0) = x",
-            "(x * 1) = x",
-            "(x * 0) = 0",
-            "(x / 1) = x",
-            "(2 + 2) = 4",
-            "(z / z) = 1",
-            "(a * (b + c)) = ((a * b) + (a * c))",
-            "(x - x) = 0",
+            "(x + (2 / q)) = a",
+            "(a + z) = b",
+            "(2 + u) = z",
+            "(7 * (w + 1)) = u",
+            "(1 + 1) = 2",
         ],
         s2rule
     );
