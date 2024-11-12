@@ -119,20 +119,29 @@ pickBest(expressions: Set<Expr>) -> Expr {
 }
 
 main() {
-    example = "((x + (2 / q)) + ((1 + 1) + (7 * (w + 1))))";
-    expr = s2expr(example);
-    rules = map(
-        [
-            "(x + (2 / q)) = a",
-            "(a + z) = b",
-            "(2 + u) = z",
+    examples = [
+        Pair("(x + y)", ["(x + y) = z"]),
+        Pair("((w * z) - 1)", ["a = b", "(w * z) = u"]),
+        Pair("(a + b)", []),
+        Pair("(u + w)", ["u = x", "w = y", "(x + y) = z"]),
+        Pair("((x + (2 / q)) + ((1 + 1) + (7 * (w + 1))))", [
             "(7 * (w + 1)) = u",
             "(1 + 1) = 2",
-        ],
-        s2rule
-    );
+            "(a + z) = b",
+            "(x + (2 / q)) = a",
+            "(2 + u) = z",
+        ]),
+    ];
 
-    transformed = transformExpression(expr, rules);
-    iteri(set2array(transformed), \idx, e -> println(i2s(idx + 1) + ". " + expr2s(e)));
-    println("\nMost simplified:\n" + expr2s(pickBest(transformed)));
+    iter(
+        examples,
+        \pair -> {
+            expr = s2expr(pair.first);
+            rules = map(pair.second, s2rule);
+            transformed = transformExpression(expr, rules);
+            println("Transforming " + expr2s(expr));
+            iteri(set2array(transformed), \idx, e -> println(i2s(idx + 1) + ". " + expr2s(e)));
+            println("Most simplified: " + expr2s(pickBest(transformed)) + "\n");
+        }
+    );
 }
