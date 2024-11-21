@@ -1,0 +1,91 @@
+import runtime;
+import lingo/pegcode/driver;
+import ds/tree;
+import ds/arrayutils;
+
+export {
+    parseAst(input: string) -> Program;
+
+    Expr ::= Add, Sub, Mul, Div, Int, Var, Apply, Update, Array;
+        Add(lhs: Expr, rhs: Expr);
+        Sub(lhs: Expr, rhs: Expr);
+        Mul(lhs: Expr, rhs: Expr);
+        Div(lhs: Expr, rhs: Expr);
+        Int(value: int);
+        Var(name: string);
+        Update(array: Var, index: Expr, value: Expr);
+        Apply(array: Var, index: Expr);
+        Array(values: [Expr]);
+
+    Type ::= IntType, ArrayType;
+        IntType();
+        ArrayType(type: Type);
+
+    Relation ::= Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual;
+        Equal();
+        NotEqual();
+        Less();
+        LessOrEqual();
+        Greater();
+        GreaterOrEqual();
+
+    Condition ::= And, Or, Not, Comparison;
+        And(lhs: Condition, rhs: Condition);
+        Or(lhs: Condition, rhs: Condition);
+        Not(cond: Condition);
+        Comparison(lhs: Expr, relation: Relation, rhs: Expr);
+
+    Body ::= Assignment, Test, Sequence, Selection, Iteration;
+        Assignment(variable: string, expr: Expr);
+        Test(cond: Condition);
+        Sequence(bodies: [Body]);
+        Selection(bodies: [Body]);
+        Iteration(body: Body);
+
+    Declaration(variable: string, type: Type);
+    Program(decls: [Declaration], body: Body);
+}
+
+parseAst(input: string) -> Program {
+    parsic(
+        compilePegGrammar("#include C:/Study/ThirdCourse/mtc/labs/nemo/nemo.lingo"),
+        input,
+        pegActions(
+            [
+                Pair("buildArray", \a -> Array(concat([a[0]], a[1]))),
+                Pair("buildSelection", \a -> Selection(concat([a[0]], a[1]))),
+            ]
+        )
+    )
+}
+
+transformDeclarations(decls: [Declaration]) -> Maybe<Tree<string, Type>> {
+    foldM(
+        decls,
+        makeTree(),
+        \tree, decl -> {
+            switch (lookupTree(tree, decl.variable)) {
+                Some(type): {
+                    println("conflicting type declarations for " + decl.variable);
+                    None();
+                };
+
+                None(): {
+                    Some(setTree(tree, decl.variable, decl.type));
+                };
+            }
+        }
+    )
+}
+
+evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
+    switch (expr) {
+        Add(lhs, rhs): {}
+        Sub(lhs, rhs): {}
+        Mul(lhs, rhs): {}
+        Div(lhs, rhs): {}
+        Int(value): {}
+        Var(name): {}
+        Array(array): {}
+    }
+}

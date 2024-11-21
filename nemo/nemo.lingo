@@ -1,0 +1,48 @@
+program = ws declaration*:decls ws body:body ws { Program(:decls, :body) };
+
+expr = add | sub | mul | div | int | var | apply | update | array;
+
+add = ws "(" ws expr:lhs ws "+" ws expr:rhs ws ")" ws { Add(:lhs, :rhs) };
+sub = ws "(" ws expr:lhs ws "-" ws expr:rhs ws ")" ws { Sub(:lhs, :rhs) };
+mul = ws "(" ws expr:lhs ws "*" ws expr:rhs ws ")" ws { Mul(:lhs, :rhs) };
+div = ws "(" ws expr:lhs ws "/" ws expr:rhs ws ")" ws { Div(:lhs, :rhs) };
+int = integer:integer { Int(:integer) };
+var = name$name { Var($name) };
+apply = ws "app" ws "(" ws var:array ws "," ws expr:index ws ")" ws { Apply(:array, :index) };
+update = ws "upd" ws "(" ws var:array ws "," ws expr:index ws "," ws expr:value ws ")" ws { Update(:array, :index, :value) };
+array = ws "[" ws expr:first ("," ws expr:other)* ws "]" ws { buildArray(:first, :other) };
+
+type = int_type | array_type;
+
+int_type = ws "int" ws  { IntType() };
+array_type = ws "[" ws type:type ws "]" ws { ArrayType(:type) };
+
+relation = 
+      "==" { Equal() }
+    | "!=" { NotEqual() }
+    | "<"  { Less() }
+    | "<=" { LessOrEqual() }
+    | ">"  { Greater() }
+    | ">=" { GreaterOrEqual() };
+
+condition = comparison | and | or | not;
+
+comparison = ws expr:lhs ws relation:relation ws expr:rhs ws { Comparison(:lhs, :relation, :rhs) };
+and = ws "(" ws condition:lhs ws "&&" ws condition:rhs ws ")" ws { And(:lhs, :rhs) };
+or = ws "(" ws condition:lhs ws "||" ws condition:rhs ws ")" ws { Or(:lhs, :rhs) };
+not = ws "!" ws condition:condition ws { Not(:condition) };
+
+declaration = ws "var" ws name$name ws ":" ws type:type ws ";" ws { Declaration($name, :type) };
+
+body = assignment | test | iteration | sequence | selection;
+
+assignment = ws name$name ws ":=" ws expr:expr ws ";" ws { Assignment($name, :expr) };
+test = ws condition:condition ws "?" ws ";" ws { Test(:condition) };
+sequence = ws "{" ws body*:bodies ws "}" ws { Sequence(:bodies) };
+selection = ws "{" ws body:first (ws "U" ws body)*:other ws "}" ws { buildSelection(:first, :other) };
+iteration = ws "{" ws body:body ws "}" ws "*" ws { Iteration(:body) }; 
+
+
+ws = (" " | "\t" | "\r" | "\n")*;
+integer = ('0'-'9')+$integer { s2i($integer) };
+name = ('a'-'z' | 'A'-'Z') ('a'-'z' | 'A'-'Z' | '0'-'9')*;
