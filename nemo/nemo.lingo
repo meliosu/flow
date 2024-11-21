@@ -1,6 +1,6 @@
 program = ws declaration*:decls ws body:body ws { Program(:decls, :body) };
 
-expr = add | sub | mul | div | int | var | apply | update | array;
+expr = add | sub | mul | div | int | apply | update | array | var;
 
 add = ws "(" ws expr:lhs ws "+" ws expr:rhs ws ")" ws { Add(:lhs, :rhs) };
 sub = ws "(" ws expr:lhs ws "-" ws expr:rhs ws ")" ws { Sub(:lhs, :rhs) };
@@ -8,9 +8,9 @@ mul = ws "(" ws expr:lhs ws "*" ws expr:rhs ws ")" ws { Mul(:lhs, :rhs) };
 div = ws "(" ws expr:lhs ws "/" ws expr:rhs ws ")" ws { Div(:lhs, :rhs) };
 int = integer:integer { Int(:integer) };
 var = name$name { Var($name) };
-apply = ws "app" ws "(" ws var:array ws "," ws expr:index ws ")" ws { Apply(:array, :index) };
-update = ws "upd" ws "(" ws var:array ws "," ws expr:index ws "," ws expr:value ws ")" ws { Update(:array, :index, :value) };
-array = ws "[" ws expr:first ("," ws expr:other)* ws "]" ws { buildArray(:first, :other) };
+apply = ws "app" ws "(" ws expr:array ws "," ws expr:index ws ")" ws { Apply(:array, :index) };
+update = ws "upd" ws "(" ws expr:array ws "," ws expr:index ws "," ws expr:value ws ")" ws { Update(:array, :index, :value) };
+array = ws "[" ws expr:first ("," ws expr)*:other ws "]" ws { buildArray(:first, :other) };
 
 type = int_type | array_type;
 

@@ -5,6 +5,7 @@ import ds/arrayutils;
 
 export {
     parseAst(input: string) -> Program;
+    isValidProgram(program: Program) -> bool;
 
     Expr ::= Add, Sub, Mul, Div, Int, Var, Apply, Update, Array;
         Add(lhs: Expr, rhs: Expr);
@@ -13,8 +14,8 @@ export {
         Div(lhs: Expr, rhs: Expr);
         Int(value: int);
         Var(name: string);
-        Update(array: Var, index: Expr, value: Expr);
-        Apply(array: Var, index: Expr);
+        Update(array: Expr, index: Expr, value: Expr);
+        Apply(array: Expr, index: Expr);
         Array(values: [Expr]);
 
     Type ::= IntType, ArrayType;
@@ -78,14 +79,191 @@ transformDeclarations(decls: [Declaration]) -> Maybe<Tree<string, Type>> {
     )
 }
 
+isValidProgram(program: Program) -> bool {
+    switch (transformDeclarations(program.decls)) {
+        Some(types): isValidBody(program.body, types);
+        None(): false;
+    }
+}
+
+isValidBody(body: Body, types: Tree<string, Type>) -> bool {
+    isValidBodies = \bodies -> {
+        fold(
+            bodies,
+            true,
+            \valid, b -> valid && isValidBody(b, types)
+        )
+    };
+    
+    switch (body) {
+        Assignment(variable, expr): isValidAssignment(Assignment(variable, expr), types);
+        Test(condition): isValidCondition(condition, types);
+        Iteration(inner): isValidBody(inner, types);
+        Selection(bodies): isValidBodies(bodies);
+        Sequence(bodies): isValidBodies(bodies);
+    }
+}
+
+isValidAssignment(assignment: Assignment, types: Tree<string, Type>) -> bool {
+    switch (lookupTree(types, assignment.variable)) {
+        Some(var_type): {
+            switch (evalType(assignment.expr, types)) {
+                Some(expr_type): {
+                    if (expr_type == var_type) {
+                        true;
+                    } else {
+                        println("left side and right side of assignment have different types");
+                        false;
+                    }
+                };
+
+                None(): {
+                    false;
+                }
+            }
+        };
+
+        None(): {
+            println("can't find type for left side of assignment for variable " + assignment.variable);
+            false;
+        };
+    }
+}
+
+isValidCondition(condition: Condition, types: Tree<string, Type>) -> bool {
+    isValidComparison = \lhs, rhs -> {
+        either(maybeMap2(
+            \left, right -> {
+                if (left == IntType() && right == IntType()) {
+                    true;
+                } else {
+                    println("comparison operands must be integers");
+                    false;
+                }
+            }
+        )(evalType(lhs, types), evalType(rhs, types)), false)
+    };
+    
+    switch (condition) {
+        And(lhs, rhs): isValidCondition(lhs, types) && isValidCondition(rhs, types);
+        Or(lhs, rhs): isValidCondition(lhs, types) && isValidCondition(rhs, types);
+        Not(cond): isValidCondition(cond, types);
+        Comparison(lhs, _, rhs): isValidComparison(lhs, rhs);
+    }
+}
+
 evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
+    evalBinopType = \lhs, rhs -> {
+        maybeBind2(
+            \left, right -> {
+                if (left == IntType() && right == IntType()) {
+                    Some(IntType());
+                } else {
+                    println("operand of a binary operation should have int type");
+                    None();
+                }
+            }
+        )(evalType(lhs, types), evalType(rhs, types))
+    };
+
+    evalArrayType = \values -> {
+        maybeBind(
+            evalType(values[0], types),
+            \type -> {
+                foldM(
+                    values,
+                    type,
+                    \ty, e -> {
+                        maybeBind(
+                            evalType(e, types),
+                            \e_ty -> {
+                                if (e_ty == type) {
+                                    Some(ArrayType(type));
+                                } else {
+                                    None();
+                                }
+                            }
+                        )
+                    }
+                )
+            }
+        )
+    };
+
+    evalUpdateType = \array, index, value -> {
+        maybeBind(
+            evalType(array, types),
+            \array_ty -> maybeBind(
+                evalType(index, types),
+                \index_ty -> maybeBind(
+                    evalType(value, types),
+                    \value_ty -> {
+                        switch (array_ty) {
+                            ArrayType(element_ty): {
+                                switch (index_ty) {
+                                    IntType(): {
+                                        if (element_ty == value_ty) {
+                                            Some(value_ty);
+                                        } else {
+                                            println("array element type does not match value in upd");
+                                            None();
+                                        }
+                                    }
+
+                                    ArrayType(_): {
+                                        println("array index must be an integer");
+                                        None();
+                                    }
+                                }
+                            }
+
+                            IntType(): {
+                                println("first argument to upd must be an array");
+                                None();
+                            }
+                        }
+                    }
+                )
+            )
+        )
+    };
+
+    evalApplyType = \array, index -> {
+        maybeBind(
+            evalType(array, types),
+            \array_ty -> maybeBind(
+                evalType(index, types),
+                \index_ty -> {
+                    switch (array_ty) {
+                        ArrayType(value_ty): {
+                            switch (index_ty) {
+                                IntType(): Some(value_ty);
+                                ArrayType(_): {
+                                    println("array index must be an integer");
+                                    None();
+                                }
+                            }
+                        };
+
+                        IntType(): {
+                            println("first argument to app must be an array");
+                            None();
+                        }
+                    }
+                }
+            )
+        )
+    };
+    
     switch (expr) {
-        Add(lhs, rhs): {}
-        Sub(lhs, rhs): {}
-        Mul(lhs, rhs): {}
-        Div(lhs, rhs): {}
-        Int(value): {}
-        Var(name): {}
-        Array(array): {}
+        Add(lhs, rhs): evalBinopType(lhs, rhs);
+        Sub(lhs, rhs): evalBinopType(lhs, rhs);
+        Mul(lhs, rhs): evalBinopType(lhs, rhs);
+        Div(lhs, rhs): evalBinopType(lhs, rhs);
+        Int(value): Some(IntType());
+        Var(name): lookupTree(types, name);
+        Array(values): evalArrayType(values);
+        Apply(array, index): evalApplyType(array, index);
+        Update(array, index, value): evalUpdateType(array, index, value);
     }
 }
