@@ -203,7 +203,7 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
                                 switch (index_ty) {
                                     IntType(): {
                                         if (element_ty == value_ty) {
-                                            Some(value_ty);
+                                            Some(array_ty);
                                         } else {
                                             println("array element type does not match value in upd");
                                             None();
