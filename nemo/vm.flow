@@ -4,8 +4,8 @@ import ds/tree;
 import ds/arrayutils;
 
 VMInsn ::= VMAssign, VMIf;
-    VMAssign(var: string, expr: Expr, next: [int]);
-    VMIf(cond: Condition, then: [int], or_else: [int]);
+    VMAssign(label: int, var: string, expr: Expr, next: [int]);
+    VMIf(label:int, cond: Condition, then: [int], or_else: [int]);
 
 VMValue ::= VMInt, VMArray;
     VMInt(value: int);
@@ -13,6 +13,29 @@ VMValue ::= VMInt, VMArray;
 
 VMState(pos: int, values: Tree<string, VMValue>);
 VMProgram(insns: [VMInsn]);
+
+translateProgram(program: Program) -> VMProgram {
+    VMProgram(translateBody(program.body))
+}
+
+translateBody(body: Body) -> [VMInsn] {
+    switch (body) {
+        Assignment(variable, expr): {}
+        Test(cond): {}
+        Sequence(bodies): {}
+        Selection(bodies): {}
+        Iteration(inner): {}
+    }
+}
+
+insnsWithLabel(insns: [VMInsn], label: int) -> [VMInsn] {
+    filter(insns, \insn -> {
+        switch (insn) {
+            VMAssign(l, _, _, _): l == label;
+            VMIf(l, _, _, _): l == label;
+        }
+    })
+}
 
 vmProgramRun(program: VMProgram) {
     start = VMState(0, makeTree());
@@ -38,55 +61,66 @@ vmRun(program: VMProgram, state: VMState, limit: int) -> Maybe<Set<VMState>> {
     if (limit == 0) {
         Some(makeSet1(state));
     } else {
-        switch (program.insns[state.pos]) {
-            VMAssign(var, expr, next): {
-                maybeBind(
-                    evalExpr(expr, state.values),
-                    \expr_value -> {
-                        if (length(next) == 0) {
-                            Some(makeSet1(VMState(state.pos, setTree(state.values, var, expr_value))));
-                        } else {
-                            foldM(
-                                next,
-                                \set, next_pos -> {
-                                    next_state = VMState(
-                                        next_pos,
-                                        setTree(state.values, var, expr_value)
-                                    );
+        foldM(
+            insnsWithLabel(program.insns, state.pos),
+            makeSet(),
+            \S, insn -> {
+                newS = switch (insn) {
+                    VMAssign(_, var, expr, next): {
+                        maybeBind(
+                            evalExpr(expr, state.values),
+                            \expr_value -> {
+                                if (length(next) == 0) {
+                                    Some(makeSet1(VMState(state.pos, setTree(state.values, var, expr_value))));
+                                } else {
+                                    foldM(
+                                        next,
+                                        \set, next_pos -> {
+                                            next_state = VMState(
+                                                next_pos,
+                                                setTree(state.values, var, expr_value)
+                                            );
 
-                                    maybeMap(
-                                        vmRun(program, next_state, limit - 1),
-                                        \next_set -> mergeSets(set, next_set)
+                                            maybeMap(
+                                                vmRun(program, next_state, limit - 1),
+                                                \next_set -> mergeSets(set, next_set)
+                                            );
+                                        }
                                     );
                                 }
-                            );
-                        }
-                    }
-                )
-            };
+                            }
+                        )
+                    };
 
-            VMIf(cond, then, or_else): {
-                maybeBind(
-                    evalCondition(cond, state.values),
-                    \cond_value -> {
-                        jumps = if (cond_value) { then } else { or_else };
+                    VMIf(_, cond, then, or_else): {
+                        maybeBind(
+                            evalCondition(cond, state.values),
+                            \cond_value -> {
+                                jumps = if (cond_value) { then } else { or_else };
 
-                        if (length(jumps) == 0) {
-                            Some(makeSet1(state));
-                        } else {
-                            foldM(
-                                jumps,
-                                makeSet(),
-                                \set, next_pos -> maybeMap(
-                                    vmRun(program, VMState(next_pos, state.values), limit - 1),
-                                    \next_set -> mergeSets(set, next_set)
-                                )
-                            );
-                        }
-                    }
-                )
-            };
-        }
+                                if (length(jumps) == 0) {
+                                    Some(makeSet1(state));
+                                } else {
+                                    foldM(
+                                        jumps,
+                                        makeSet(),
+                                        \set, next_pos -> maybeMap(
+                                            vmRun(program, VMState(next_pos, state.values), limit - 1),
+                                            \next_set -> mergeSets(set, next_set)
+                                        )
+                                    );
+                                }
+                            }
+                        )
+                    };
+                };
+
+                maybeMap(
+                    newS,
+                    \idk -> mergetSets(S, idk)
+                );
+            }
+        )        
     }
 }
 
@@ -150,7 +184,7 @@ evalExpr(expr: Expr, values: Tree<string, VMValue>) -> Maybe<VMValue> {
     evalApply = \array, index -> {
         maybeBind2(
             \arr, ind -> {
-                swtich (arr) {
+                switch (arr) {
                     VMArray(array_values): {
                         switch (ind) {
                             VMInt(ind_value): Some(array_values[ind_value])
@@ -180,7 +214,7 @@ evalExpr(expr: Expr, values: Tree<string, VMValue>) -> Maybe<VMValue> {
 evalCondition(cond: Condition, values: Tree<string, VMValue>) -> Maybe<bool> {
     evalBinCond = \lhs, rhs, combine -> {
         maybeMap2(
-            \left, right -> combine(left, right);
+            \left, right -> combine(left, right)
         )(evalCondition(lhs, values), evalCondition(rhs, values));
     };
 
@@ -213,7 +247,7 @@ evalCondition(cond: Condition, values: Tree<string, VMValue>) -> Maybe<bool> {
         )(evalExpr(lhs, values), evalExpr(rhs, values));
     };
     
-    swtich (cond) {
+    switch (cond) {
         And(lhs, rhs): evalBinCondition(lhs, rhs, \a, b -> a && b);
         Or(lhs, rhs): evalBinCondition(lhs, rhs, \a, b -> a || b);
         Not(inner): maybeMap(evalCondition(inner, values), \a -> !a);
@@ -227,18 +261,16 @@ insn2s(insn: VMInsn) -> string {
     };
     
     switch (insn) {
-        VMAssign(var, expr, next): var + " := " + expr2s(expr) + " goto " + jumps2s(next);
-        VMIf(cond, then, or_else): "if(" + cond2s(cond) + ") then " + jumps2s(then) + " else " + jumps2s(or_else);
+        VMAssign(label, var, expr, next): {
+            label + ": " + var + " := " + expr2s(expr) + " goto " + jumps2s(next);
+        }
+
+        VMIf(label, cond, then, or_else): {
+            label + ": " + "if(" + cond2s(cond) + ") then " + jumps2s(then) + " else " + jumps2s(or_else);
+        }
     }
 }
 
 vmProgram2s(program: VMProgram) -> string {
-    concatStrings(
-        mapi(
-            program.insns,
-            \idx, insn -> {
-                i2s(idx) + ": " + insn2s(insn) + "\n"
-            }
-        )
-    )
+    concatStrings(map(program.insns, \insn -> insn2s(insn) + "\n"))
 }
