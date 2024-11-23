@@ -1,6 +1,6 @@
-import runtime;
 import nemo;
 import ds/tree;
+import ds/set;
 import ds/arrayutils;
 
 export {
@@ -20,22 +20,20 @@ export {
     VMProgram(insns: [VMInsn]);
 }
 
-vmProgramRun(program: VMProgram, limit: int) {
+vmProgramRun(program: VMProgram, limit: int) -> void {
     start = VMState(0, makeTree());
 
     switch (vmRun(program, start, limit)) {
         Some(states): {
             iterSet(
                 states,
-                \state -> {
-                    println(state2s(state) + "\n\n");
-                }
-            )
+                \state -> println(state2s(state) + "\n\n")
+            );
         };
 
         None(): {
             println("error running VM");
-        }
+        };
     }
 }
 
@@ -80,7 +78,9 @@ translateBody(b: Body) -> [VMInsn] {
 
         Iteration(inner): {
             translated = translateBody(inner);
-            if_insn = VMIf(0, Comparison(Int(0), Int(0)), [1, -1], []);
+
+            // TODO: change
+            if_insn = VMIf(0, Comparison(Int(0), Equal(), Int(0)), [1, -1], []);
             shifted = shiftLabels(translated, 1);
             connected = connectLabels(shifted, 0);
             concat([if_insn], connected);
@@ -92,8 +92,8 @@ translateBody(b: Body) -> [VMInsn] {
 
 insnLabel(insn: VMInsn) -> int {
     switch (insn) {
-        VMAssign(label, _, _, _): label;
-        VMIf(label, _, _, _): label;
+        VMAssign(label, _var, _expr, _goto): label;
+        VMIf(label, _cond, _then, _or_else): label;
     }
 }
 
@@ -119,7 +119,7 @@ cleanEnds(insns: [VMInsn]) -> [VMInsn] {
 }
 
 shiftLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
-    shift = \array -> {
+    doShift = \array -> {
         map(array, \a -> if (a >= 0) { a + shift } else { a })
     };
     
@@ -127,11 +127,11 @@ shiftLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
         insns,
         \insn -> switch (insn) {
             VMAssign(label, var, expr, goto): {
-                VMAssign(label + shift, var, expr, shift(goto))
+                VMAssign(label + shift, var, expr, doShift(goto))
             };
 
             VMIf(label, cond, then, or_else): {
-                VMIf(label + shift, cond, shift(then), shift(or_else))
+                VMIf(label + shift, cond, doShift(then), doShift(or_else))
             };
         }
     )
@@ -155,12 +155,7 @@ connectLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
 }
 
 insnsWithLabel(insns: [VMInsn], label: int) -> [VMInsn] {
-    filter(insns, \insn -> {
-        switch (insn) {
-            VMAssign(l, _, _, _): l == label;
-            VMIf(l, _, _, _): l == label;
-        }
-    })
+    filter(insns, \insn -> insnLabel(insn) == label)
 }
 
 vmRun(program: VMProgram, state: VMState, limit: int) -> Maybe<Set<VMState>> {
@@ -181,6 +176,7 @@ vmRun(program: VMProgram, state: VMState, limit: int) -> Maybe<Set<VMState>> {
                                 } else {
                                     foldM(
                                         next,
+                                        makeSet(),
                                         \set, next_pos -> {
                                             next_state = VMState(
                                                 next_pos,
@@ -223,10 +219,10 @@ vmRun(program: VMProgram, state: VMState, limit: int) -> Maybe<Set<VMState>> {
 
                 maybeMap(
                     newS,
-                    \idk -> mergetSets(S, idk)
+                    \idk -> mergeSets(S, idk)
                 );
             }
-        )        
+        );        
     }
 }
 
@@ -310,8 +306,8 @@ evalExpr(expr: Expr, values: Tree<string, VMValue>) -> Maybe<VMValue> {
         Mul(lhs, rhs): evalBinop(lhs, rhs, \a, b -> a * b);
         Div(lhs, rhs): evalBinop(lhs, rhs, \a, b -> a / b);
         Int(value): Some(VMInt(value));
-        Var(name): lookupTree(value, name);
-        Array(array): evalArray(array);
+        Var(name): lookupTree(values, name);
+        Array(array): maybeMap(evalArray(array), \arr -> VMArray(arr));
         Update(array, index, value): evalUpdate(array, index, value);
         Apply(array, index): evalApply(array, index);
     }
@@ -354,8 +350,8 @@ evalCondition(cond: Condition, values: Tree<string, VMValue>) -> Maybe<bool> {
     };
     
     switch (cond) {
-        And(lhs, rhs): evalBinCondition(lhs, rhs, \a, b -> a && b);
-        Or(lhs, rhs): evalBinCondition(lhs, rhs, \a, b -> a || b);
+        And(lhs, rhs): evalBinCond(lhs, rhs, \a, b -> a && b);
+        Or(lhs, rhs): evalBinCond(lhs, rhs, \a, b -> a || b);
         Not(inner): maybeMap(evalCondition(inner, values), \a -> !a);
         Comparison(lhs, relation, rhs): evalComparison(lhs, relation, rhs);
     }
@@ -368,11 +364,11 @@ insn2s(insn: VMInsn) -> string {
     
     switch (insn) {
         VMAssign(label, var, expr, next): {
-            label + ": " + var + " := " + expr2s(expr) + " goto " + jumps2s(next);
+            i2s(label) + ": " + var + " := " + expr2s(expr) + " goto " + jumps2s(next);
         }
 
         VMIf(label, cond, then, or_else): {
-            label + ": " + "if(" + cond2s(cond) + ") then " + jumps2s(then) + " else " + jumps2s(or_else);
+            i2s(label) + ": " + "if(" + cond2s(cond) + ") then " + jumps2s(then) + " else " + jumps2s(or_else);
         }
     }
 }
@@ -400,7 +396,7 @@ state2s(state: VMState) -> string {
         foldTree(
             state.values,
             [],
-            \result, variable, value -> {
+            \variable, value, result -> {
                 concat(
                     result,
                     [variable + " : " + value2s(value) + "\n"]
