@@ -1,0 +1,222 @@
+import runtime;
+import nemo;
+import ds/tree;
+import ds/arrayutils;
+
+VMInsn ::= VMAssign, VMIf;
+    VMAssign(var: string, expr: Expr, next: [int]);
+    VMIf(cond: Condition, then: [int], or_else: [int]);
+
+VMValue ::= VMInt, VMArray;
+    VMInt(value: int);
+    VMArray(values: [VMValue]);
+
+VMState(pos: int, values: Tree<string, VMValue>);
+VMProgram(insns: [VMInsn]);
+
+vmProgramRun(program: VMProgram) {
+    start = VMState(0, makeTree());
+    limit = 100;
+
+    switch (vmRun(program, start, limit)) {
+        Some(states): {
+            iterSet(
+                states,
+                \state -> {
+                    println("[*] " + "TODO: add state printing");
+                }
+            )
+        };
+
+        None(): {
+            println("error running VM");
+        }
+    }
+}
+
+vmRun(program: VMProgram, state: VMState, limit: int) -> Maybe<Set<VMState>> {
+    if (limit == 0) {
+        Some(makeSet1(state));
+    } else {
+        switch (program.insns[state.pos]) {
+            VMAssign(var, expr, next): {
+                maybeBind(
+                    evalExpr(expr, state.values),
+                    \expr_value -> {
+                        if (length(next) == 0) {
+                            Some(makeSet1(VMState(state.pos, setTree(state.values, var, expr_value))));
+                        } else {
+                            foldM(
+                                next,
+                                \set, next_pos -> {
+                                    next_state = VMState(
+                                        next_pos,
+                                        setTree(state.values, var, expr_value)
+                                    );
+
+                                    maybeMap(
+                                        vmRun(program, next_state, limit - 1),
+                                        \next_set -> mergeSets(set, next_set)
+                                    );
+                                }
+                            );
+                        }
+                    }
+                )
+            };
+
+            VMIf(cond, then, or_else): {
+                maybeBind(
+                    evalCondition(cond, state.values),
+                    \cond_value -> {
+                        jumps = if (cond_value) { then } else { or_else };
+
+                        if (length(jumps) == 0) {
+                            Some(makeSet1(state));
+                        } else {
+                            foldM(
+                                jumps,
+                                makeSet(),
+                                \set, next_pos -> maybeMap(
+                                    vmRun(program, VMState(next_pos, state.values), limit - 1),
+                                    \next_set -> mergeSets(set, next_set)
+                                )
+                            );
+                        }
+                    }
+                )
+            };
+        }
+    }
+}
+
+evalExpr(expr: Expr, values: Tree<string, VMValue>) -> Maybe<VMValue> {
+    evalBinop = \lhs, rhs, op -> {
+        maybeBind2(
+            \left, right -> {
+                switch (left) {
+                    VMInt(left_value): {
+                        switch (right) {
+                            VMInt(right_value): Some(VMInt(op(left_value, right_value)));
+                            VMArray(_): None();
+                        }
+                    };
+
+                    VMArray(_): None();
+                }
+            }
+        )(evalExpr(lhs, values), evalExpr(rhs, values))
+    };
+
+    evalArray = \array -> {
+        foldM(
+            array,
+            [],
+            \arr, e -> {
+                switch (evalExpr(e, values)) {
+                    Some(value): Some(arrayPush(arr, value));
+                    None(): None();
+                }
+            }
+        )
+    };
+
+    evalUpdate = \array, index, value -> {
+        maybeBind(
+            evalExpr(array, values),
+            \arr -> maybeBind(
+                evalExpr(index, values),
+                \ind -> maybeBind(
+                    evalExpr(value, values),
+                    \val -> {
+                        switch (arr) {
+                            VMArray(arr_values): {
+                                // TODO: typecheck val
+                                
+                                switch (ind) {
+                                    VMInt(ind_value): Some(VMArray(insertArray(arr_values, ind_value, val)));
+                                    VMArray(_): None();
+                                }
+                            };
+
+                            VMInt(_): None();
+                        }
+                    }
+                )
+            )
+        )
+    };
+
+    evalApply = \array, index -> {
+        maybeBind2(
+            \arr, ind -> {
+                swtich (arr) {
+                    VMArray(array_values): {
+                        switch (ind) {
+                            VMInt(ind_value): Some(array_values[ind_value])
+                            VMArray(_): None();
+                        }
+                    };
+
+                    VMInt(_): None();
+                }
+            }
+        )(evalExpr(array, values), evalExpr(index, values))
+    };
+
+    switch (expr) {
+        Add(lhs, rhs): evalBinop(lhs, rhs, \a, b -> a + b);
+        Sub(lhs, rhs): evalBinop(lhs, rhs, \a, b -> a - b);
+        Mul(lhs, rhs): evalBinop(lhs, rhs, \a, b -> a * b);
+        Div(lhs, rhs): evalBinop(lhs, rhs, \a, b -> a / b);
+        Int(value): Some(VMInt(value));
+        Var(name): lookupTree(value, name);
+        Array(array): evalArray(array);
+        Update(array, index, value): evalUpdate(array, index, value);
+        Apply(array, index): evalApply(array, index);
+    }
+}
+
+evalCondition(cond: Condition, values: Tree<string, VMValue>) -> Maybe<bool> {
+    evalBinCond = \lhs, rhs, combine -> {
+        maybeMap2(
+            \left, right -> combine(left, right);
+        )(evalCondition(lhs, values), evalCondition(rhs, values));
+    };
+
+    evalComparison = \lhs, relation, rhs -> {
+        maybeBind2(
+            \left, right -> {
+                switch (left) {
+                    VMInt(left_value): {
+                        switch (right) {
+                            VMInt(right_value): {
+                                cmp = switch (relation) {
+                                    Equal(): left_value == right_value;
+                                    NotEqual(): left_value != right_value;
+                                    Less(): left_value < right_value;
+                                    LessOrEqual(): left_value <= right_value;
+                                    Greater(): left_value > right_value;
+                                    GreaterOrEqual(): left_value >= right_value;
+                                };
+
+                                Some(cmp);
+                            };
+
+                            VMArray(_): None();
+                        }
+                    };
+
+                    VMArray(_): None();
+                }
+            }
+        )(evalExpr(lhs, values), evalExpr(rhs, values));
+    };
+    
+    swtich (cond) {
+        And(lhs, rhs): evalBinCondition(lhs, rhs, \a, b -> a && b);
+        Or(lhs, rhs): evalBinCondition(lhs, rhs, \a, b -> a || b);
+        Not(inner): maybeMap(evalCondition(inner, values), \a -> !a);
+        Comparison(lhs, relation, rhs): evalComparison(lhs, relation, rhs);
+    }
+}
