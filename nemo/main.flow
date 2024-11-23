@@ -6,13 +6,10 @@ main() {
     program = "
         var a: [int];
         var b: int;
-        {{
-            {
-                a := [1];
-            } U {
-                b := app(a, 0);
-            }
-        }}*
+        {
+            a := [1];
+            b := app(a, 0);
+        }
     ";
 
     ast = parseAst(
