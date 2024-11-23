@@ -6,6 +6,8 @@ import ds/arrayutils;
 export {
     parseAst(input: string) -> Program;
     isValidProgram(program: Program) -> bool;
+    expr2s(expr: Expr) -> string;
+    cond2s(cond: Condition) -> string; 
 
     Expr ::= Add, Sub, Mul, Div, Int, Var, Apply, Update, Array;
         Add(lhs: Expr, rhs: Expr);
@@ -265,5 +267,62 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
         Array(values): evalArrayType(values);
         Apply(array, index): evalApplyType(array, index);
         Update(array, index, value): evalUpdateType(array, index, value);
+    }
+}
+
+expr2s(expr: Expr) -> string {
+    binop2s = \lhs, rhs, sign -> "(" + expr2s(lhs) + sign + expr2s(rhs) + ")";
+    
+    array2s = \array -> {
+        inner = concatStrings(interleave(
+            map(
+                array,
+                \e -> expr2s(e),
+            ),
+
+            ", "
+        ));
+
+        "[" + inner + "]"
+    };
+
+    update2s = \array, index, value -> {
+        "upd(" + expr2s(array) + ", " + expr2s(index) + ", " + expr2s(value) + ")"
+    };
+
+    apply2s = \array, index -> {
+        "app(" + expr2s(array) + ", " + expr2s(index) + ")"
+    };
+    
+    switch (expr) {
+        Add(lhs, rhs): binop2s(lhs, rhs, "+");
+        Sub(lhs, rhs): binop2s(lhs, rhs, "-");
+        Mul(lhs, rhs): binop2s(lhs, rhs, "*");
+        Div(lhs, rhs): binop2s(lhs, rhs, "/");
+        Var(name): name;
+        Int(value): i2s(value);
+        Array(array): array2s(array);
+        Update(array, index, value): update2s(array, index, value);
+        Apply(array, index): apply2s(array, index);
+    }
+}
+
+relation2s(relation: Relation) -> string {
+    switch (relation) {
+        Equal(): "==";
+        NotEqual(): "!=";
+        Less(): "<";
+        LessOrEqual(): "<=";
+        Greater(): ">";
+        GreaterOrEqual(): ">=0";
+    }
+}
+
+cond2s(cond: Condition) -> string {
+    switch (cond) {
+        And(lhs, rhs): "(" + cond2s(lhs) + " && " + cond2s(rhs) + ")";
+        Or(lhs, rhs): "(" + cond2s(lhs) + " || " + cond2s(rhs) + ")";
+        Not(inner): "!" + cond2s(inner);
+        Comparison(lhs, relation, rhs): expr2s(lhs) + " " + relation2s(relation) + " " + expr2s(rhs);
     }
 }

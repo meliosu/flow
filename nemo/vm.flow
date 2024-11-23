@@ -220,3 +220,25 @@ evalCondition(cond: Condition, values: Tree<string, VMValue>) -> Maybe<bool> {
         Comparison(lhs, relation, rhs): evalComparison(lhs, relation, rhs);
     }
 }
+
+insn2s(insn: VMInsn) -> string {
+    jumps2s = \jumps -> {
+        "{" + concatStrings(interleave(map(jumps, \j -> i2s(j)), ", ")) + "}";
+    };
+    
+    switch (insn) {
+        VMAssign(var, expr, next): var + " := " + expr2s(expr) + " goto " + jumps2s(next);
+        VMIf(cond, then, or_else): "if(" + cond2s(cond) + ") then " + jumps2s(then) + " else " + jumps2s(or_else);
+    }
+}
+
+vmProgram2s(program: VMProgram) -> string {
+    concatStrings(
+        mapi(
+            program.insns,
+            \idx, insn -> {
+                i2s(idx) + ": " + insn2s(insn) + "\n"
+            }
+        )
+    )
+}
