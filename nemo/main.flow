@@ -1,9 +1,10 @@
 import runtime;
 
 import nemo;
+import vm;
 
 main() {
-    program = "
+    src = "
         var a: [int];
         var b: int;
         {
@@ -12,14 +13,16 @@ main() {
         }
     ";
 
-    ast = parseAst(
-        program
-    );
+    program = parseAst(src);
 
-    println(ast);
+    println("nemo ast: \n" + program);
 
     if (isValidProgram(ast)) {
         println("valid nemo");
+        translated = translateProgram(program);
+        println("vm: \n" + translated);
+        printnt("vm (string): \n" + vmProgram2s(translated));
+        vmProgramRun(translated);
     } else {
         println("error!");
     }
