@@ -3,16 +3,41 @@ import nemo;
 import ds/tree;
 import ds/arrayutils;
 
-VMInsn ::= VMAssign, VMIf;
-    VMAssign(label: int, var: string, expr: Expr, next: [int]);
-    VMIf(label: int, cond: Condition, then: [int], or_else: [int]);
+export {
+    translateProgram(program: Program) -> VMProgram;
+    vmProgramRun(program: VMProgram, limit: int);
+    vmProgram2s(program: VMProgram) -> string;
 
-VMValue ::= VMInt, VMArray;
-    VMInt(value: int);
-    VMArray(values: [VMValue]);
+    VMInsn ::= VMAssign, VMIf;
+        VMAssign(label: int, var: string, expr: Expr, next: [int]);
+        VMIf(label: int, cond: Condition, then: [int], or_else: [int]);
 
-VMState(pos: int, values: Tree<string, VMValue>);
-VMProgram(insns: [VMInsn]);
+    VMValue ::= VMInt, VMArray;
+        VMInt(value: int);
+        VMArray(values: [VMValue]);
+
+    VMState(pos: int, values: Tree<string, VMValue>);
+    VMProgram(insns: [VMInsn]);
+}
+
+vmProgramRun(program: VMProgram, limit: int) {
+    start = VMState(0, makeTree());
+
+    switch (vmRun(program, start, limit)) {
+        Some(states): {
+            iterSet(
+                states,
+                \state -> {
+                    println(state2s(state) + "\n\n");
+                }
+            )
+        };
+
+        None(): {
+            println("error running VM");
+        }
+    }
+}
 
 translateProgram(program: Program) -> VMProgram {
     VMProgram(translateBody(program.body))
@@ -136,26 +161,6 @@ insnsWithLabel(insns: [VMInsn], label: int) -> [VMInsn] {
             VMIf(l, _, _, _): l == label;
         }
     })
-}
-
-vmProgramRun(program: VMProgram) {
-    start = VMState(0, makeTree());
-    limit = 100;
-
-    switch (vmRun(program, start, limit)) {
-        Some(states): {
-            iterSet(
-                states,
-                \state -> {
-                    println("[*] " + "TODO: add state printing");
-                }
-            )
-        };
-
-        None(): {
-            println("error running VM");
-        }
-    }
 }
 
 vmRun(program: VMProgram, state: VMState, limit: int) -> Maybe<Set<VMState>> {
@@ -374,4 +379,35 @@ insn2s(insn: VMInsn) -> string {
 
 vmProgram2s(program: VMProgram) -> string {
     concatStrings(map(program.insns, \insn -> insn2s(insn) + "\n"))
+}
+
+value2s(value: VMValue) -> string {
+    switch (value) {
+        VMInt(v): i2s(v);
+        VMArray(array): {
+            inner = concatStrings(
+                interleave(map(array, \v -> value2s(v)), ", ")
+            );
+
+            "[" + inner + "]";
+        }
+    }
+}
+
+state2s(state: VMState) -> string {
+    header = "[ON LABEL " + i2s(state.pos) + "]\n";
+    values = concatStrings(
+        foldTree(
+            state.values,
+            [],
+            \result, variable, value -> {
+                concat(
+                    result,
+                    [variable + " : " + value2s(value) + "\n"]
+                )
+            }
+        )
+    );
+
+    header + values
 }
