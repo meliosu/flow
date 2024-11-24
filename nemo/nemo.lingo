@@ -25,8 +25,10 @@ relation =
     | ">"  { Greater() }
     | ">=" { GreaterOrEqual() };
 
-condition = comparison | and | or | not;
+condition = true | false | comparison | and | or | not;
 
+true = ws "true" ws { True() };
+false = ws "false" ws { False() }; 
 comparison = ws expr:lhs ws relation:relation ws expr:rhs ws { Comparison(:lhs, :relation, :rhs) };
 and = ws "(" ws condition:lhs ws "&&" ws condition:rhs ws ")" ws { And(:lhs, :rhs) };
 or = ws "(" ws condition:lhs ws "||" ws condition:rhs ws ")" ws { Or(:lhs, :rhs) };

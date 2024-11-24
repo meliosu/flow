@@ -5,14 +5,19 @@ import vm;
 
 main() {
     src = "
-        var a: [int];
-        var b: int;
+        var x: int;
+        var y: int;
+        var arr: [int];
         {
-            {
-                a := [1];
-            } U {
-                b := 2;
-            }
+            x := 0;
+            y := 50;
+            arr := [0];
+
+            {{
+                x := (x + 1);
+                arr := upd(arr, x, x);
+                x < y?;
+            }}*
         }
     ";
 
@@ -33,7 +38,7 @@ main() {
         println(vmProgram2s(translated));
         println("\n");
 
-        vmProgramRun(translated, 100);
+        vmProgramRun(translated, 500);
     } else {
         println("NeMo is invalid");
     }

@@ -31,7 +31,9 @@ export {
         Greater();
         GreaterOrEqual();
 
-    Condition ::= And, Or, Not, Comparison;
+    Condition ::= True, False, And, Or, Not, Comparison;
+        True();
+        False();
         And(lhs: Condition, rhs: Condition);
         Or(lhs: Condition, rhs: Condition);
         Not(cond: Condition);
@@ -146,6 +148,8 @@ isValidCondition(condition: Condition, types: Tree<string, Type>) -> bool {
     };
     
     switch (condition) {
+        True(): true;
+        False(): true;
         And(lhs, rhs): isValidCondition(lhs, types) && isValidCondition(rhs, types);
         Or(lhs, rhs): isValidCondition(lhs, types) && isValidCondition(rhs, types);
         Not(cond): isValidCondition(cond, types);
@@ -319,6 +323,8 @@ relation2s(relation: Relation) -> string {
 
 cond2s(cond: Condition) -> string {
     switch (cond) {
+        True(): "true";
+        False(): "false";
         And(lhs, rhs): "(" + cond2s(lhs) + " && " + cond2s(rhs) + ")";
         Or(lhs, rhs): "(" + cond2s(lhs) + " || " + cond2s(rhs) + ")";
         Not(inner): "!" + cond2s(inner);

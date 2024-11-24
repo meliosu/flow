@@ -21,20 +21,20 @@ export {
 }
 
 vmProgramRun(program: VMProgram, limit: int) -> void {
-    // start = VMState(0, makeTree());
+    start = VMState(0, makeTree());
 
-    // switch (vmRun(program, start, limit)) {
-    //     Some(states): {
-    //         iterSet(
-    //             states,
-    //             \state -> println(state2s(state) + "\n\n")
-    //         );
-    //     };
+    switch (vmRun(program, start, limit)) {
+        Some(states): {
+            iterSet(
+                states,
+                \state -> println(state2s(state) + "\n\n")
+            );
+        };
 
-    //     None(): {
-    //         println("error running VM");
-    //     };
-    // }
+        None(): {
+            println("error running VM");
+        };
+    }
 }
 
 translateProgram(program: Program) -> VMProgram {
@@ -84,7 +84,7 @@ translateBody(b: Body) -> [VMInsn] {
             translated = translateBody(inner);
 
             // TODO: change
-            if_insn = VMIf(0, Comparison(Int(0), Equal(), Int(0)), [1, -1], []);
+            if_insn = VMIf(0, True(), [1, -1], []);
             shifted = shiftLabels(translated, 1);
             connected = connectLabels(shifted, 0);
             concat([if_insn], connected);
@@ -373,6 +373,8 @@ evalCondition(cond: Condition, values: Tree<string, VMValue>) -> Maybe<bool> {
     };
     
     switch (cond) {
+        True(): Some(true);
+        False(): Some(false);
         And(lhs, rhs): evalBinCond(lhs, rhs, \a, b -> a && b);
         Or(lhs, rhs): evalBinCond(lhs, rhs, \a, b -> a || b);
         Not(inner): maybeMap(evalCondition(inner, values), \a -> !a);
