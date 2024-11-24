@@ -8,22 +8,33 @@ main() {
         var a: [int];
         var b: int;
         {
-            a := [1];
-            b := app(a, 0);
+            {
+                a := [1];
+            } U {
+                b := 2;
+            }
         }
     ";
 
     program = parseAst(src);
 
-    println("nemo ast: \n" + program);
+    println("nemo ast:");
+    println(program);
+    println("\n");
 
-    if (isValidProgram(ast)) {
-        println("valid nemo");
+    if (isValidProgram(program)) {
         translated = translateProgram(program);
-        println("vm: \n" + translated);
-        printnt("vm (string): \n" + vmProgram2s(translated));
-        vmProgramRun(translated);
+
+        println("vm:");
+        println(translated);
+        println("\n");
+
+        println("vm (string):");
+        println(vmProgram2s(translated));
+        println("\n");
+
+        vmProgramRun(translated, 100);
     } else {
-        println("error!");
+        println("NeMo is invalid");
     }
 }

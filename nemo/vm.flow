@@ -5,7 +5,7 @@ import ds/arrayutils;
 
 export {
     translateProgram(program: Program) -> VMProgram;
-    vmProgramRun(program: VMProgram, limit: int);
+    vmProgramRun(program: VMProgram, limit: int) -> void;
     vmProgram2s(program: VMProgram) -> string;
 
     VMInsn ::= VMAssign, VMIf;
@@ -21,28 +21,28 @@ export {
 }
 
 vmProgramRun(program: VMProgram, limit: int) -> void {
-    start = VMState(0, makeTree());
+    // start = VMState(0, makeTree());
 
-    switch (vmRun(program, start, limit)) {
-        Some(states): {
-            iterSet(
-                states,
-                \state -> println(state2s(state) + "\n\n")
-            );
-        };
+    // switch (vmRun(program, start, limit)) {
+    //     Some(states): {
+    //         iterSet(
+    //             states,
+    //             \state -> println(state2s(state) + "\n\n")
+    //         );
+    //     };
 
-        None(): {
-            println("error running VM");
-        };
-    }
+    //     None(): {
+    //         println("error running VM");
+    //     };
+    // }
 }
 
 translateProgram(program: Program) -> VMProgram {
-    VMProgram(translateBody(program.body))
+    VMProgram(cleanEnds(translateBody(program.body)))
 }
 
 translateBody(b: Body) -> [VMInsn] {
-    ret = switch (b) {
+    switch (b) {
         Assignment(variable, expr): {
             [VMAssign(0, variable, expr, [-1])]
         }
@@ -56,10 +56,14 @@ translateBody(b: Body) -> [VMInsn] {
                 map(bodies, \body -> translateBody(body)),
                 [],
                 \result, body -> {
-                    shift = maxLabel(result);
-                    shifted = shiftLabels(body, shift);
-                    connected = connectLabels(result, shift);
-                    concat(connected, shifted);
+                    if (length(result) == 0) {
+                        body
+                    } else {
+                        shift = maxLabel(result);
+                        shifted = shiftLabels(body, shift);
+                        connected = connectLabels(result, shift);
+                        concat(connected, shifted);
+                    }
                 }
             )
         }
@@ -70,7 +74,7 @@ translateBody(b: Body) -> [VMInsn] {
                 [],
                 \result, body -> {
                     shift = maxLabel(result);
-                    shifted = shiftLabels(body, shift);
+                    shifted = shiftNonZeroLabels(body, shift);
                     concat(result, shifted);
                 }
             )
@@ -85,9 +89,7 @@ translateBody(b: Body) -> [VMInsn] {
             connected = connectLabels(shifted, 0);
             concat([if_insn], connected);
         }
-    };
-
-    cleanEnds(ret);
+    }
 }
 
 insnLabel(insn: VMInsn) -> int {
@@ -132,6 +134,27 @@ shiftLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
 
             VMIf(label, cond, then, or_else): {
                 VMIf(label + shift, cond, doShift(then), doShift(or_else))
+            };
+        }
+    )
+}
+
+shiftNonZeroLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
+    shiftJumps = \array -> {
+        map(array, \a -> if (a > 0) { a + shift } else { a })
+    };
+
+    shiftLabel = \label -> if (label > 0) { label + shift } else { label };
+
+    map(
+        insns,
+        \insn -> switch (insn) {
+            VMAssign(label, var, expr, goto): {
+                VMAssign(shiftLabel(label), var, expr, shiftJumps(goto))
+            };
+
+            VMIf(label, cond, then, or_else): {
+                VMIf(shiftLabel(label), cond, shiftJumps(then), shiftJumps(or_else))
             };
         }
     )
