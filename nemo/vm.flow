@@ -17,7 +17,7 @@ export {
         VMArray(values: [VMValue]);
 
     VMState(pos: int, values: Tree<string, VMValue>);
-    VMProgram(insns: [VMInsn]);
+    VMProgram(decls: [Declaration], insns: [VMInsn]);
 }
 
 vmProgramRun(program: VMProgram, limit: int) -> void {
@@ -38,7 +38,7 @@ vmProgramRun(program: VMProgram, limit: int) -> void {
 }
 
 translateProgram(program: Program) -> VMProgram {
-    VMProgram(cleanEnds(translateBody(program.body)))
+    VMProgram(program.decls, cleanEnds(translateBody(program.body)))
 }
 
 translateBody(b: Body) -> [VMInsn] {
@@ -323,11 +323,24 @@ evalExpr(expr: Expr, values: Tree<string, VMValue>) -> Maybe<VMValue> {
         )(evalExpr(array, values), evalExpr(index, values))
     };
 
+    evalNeg = \inner -> {
+        maybeBind(
+            evalExpr(inner, values),
+            \v -> {
+                switch (v) {
+                    VMInt(v_value): Some(VMInt(-v_value));
+                    VMArray(_): None();
+                }
+            }
+        )
+    };
+
     switch (expr) {
         Add(lhs, rhs): evalBinop(lhs, rhs, \a, b -> a + b);
         Sub(lhs, rhs): evalBinop(lhs, rhs, \a, b -> a - b);
         Mul(lhs, rhs): evalBinop(lhs, rhs, \a, b -> a * b);
         Div(lhs, rhs): evalBinop(lhs, rhs, \a, b -> a / b);
+        Neg(inner): evalNeg(inner);
         Int(value): Some(VMInt(value));
         Var(name): lookupTree(values, name);
         Array(array): maybeMap(evalArray(array), \arr -> VMArray(arr));

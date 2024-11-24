@@ -8,11 +8,12 @@ export {
     expr2s(expr: Expr) -> string;
     cond2s(cond: Condition) -> string; 
 
-    Expr ::= Add, Sub, Mul, Div, Int, Var, Apply, Update, Array;
+    Expr ::= Add, Sub, Mul, Div, Neg, Int, Var, Apply, Update, Array;
         Add(lhs: Expr, rhs: Expr);
         Sub(lhs: Expr, rhs: Expr);
         Mul(lhs: Expr, rhs: Expr);
         Div(lhs: Expr, rhs: Expr);
+        Neg(inner: Expr);
         Int(value: int);
         Var(name: string);
         Update(array: Expr, index: Expr, value: Expr);
@@ -271,12 +272,29 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
             )
         )
     };
+
+    evalNeg = \inner -> {
+        maybeBind(
+            evalType(inner, types),
+            \type -> {
+                switch (type) {
+                    ArrayType(_): {
+                        println("can't negate an array");
+                        None();
+                    };
+
+                    IntType(): Some(IntType());
+                }  
+            }
+        )
+    };
     
     ret = switch (expr) {
         Add(lhs, rhs): evalBinopType(lhs, rhs);
         Sub(lhs, rhs): evalBinopType(lhs, rhs);
         Mul(lhs, rhs): evalBinopType(lhs, rhs);
         Div(lhs, rhs): evalBinopType(lhs, rhs);
+        Neg(inner): evalNeg(inner);
         Int(value): Some(IntType());
         Var(name): lookupTree(types, name);
         Array(values): evalArrayType(values);
@@ -322,6 +340,7 @@ expr2s(expr: Expr) -> string {
         Sub(lhs, rhs): binop2s(lhs, rhs, "-");
         Mul(lhs, rhs): binop2s(lhs, rhs, "*");
         Div(lhs, rhs): binop2s(lhs, rhs, "/");
+        Neg(inner): "-" + expr2s(inner);
         Var(name): name;
         Int(value): i2s(value);
         Array(array): array2s(array);
@@ -354,4 +373,15 @@ cond2s(cond: Condition) -> string {
 
 assignment2s(assignment: Assignment) -> string {
     assignment.variable + " := " + expr2s(assignment.expr)
+}
+
+type2s(type: Type) -> string {
+    switch (type) {
+        IntType(): "int";
+        ArrayType(inner): "[" + type2s(inner) + "]";
+    }
+}
+
+declaration2s(declaration: Declaration) -> string {
+    declaration.variable + type2s(declaration.type)
 }
