@@ -108,7 +108,7 @@ isValidBody(body: Body, types: Tree<string, Type>) -> bool {
 }
 
 isValidAssignment(assignment: Assignment, types: Tree<string, Type>) -> bool {
-    switch (lookupTree(types, assignment.variable)) {
+    ret = switch (lookupTree(types, assignment.variable)) {
         Some(var_type): {
             switch (evalType(assignment.expr, types)) {
                 Some(expr_type): {
@@ -130,7 +130,13 @@ isValidAssignment(assignment: Assignment, types: Tree<string, Type>) -> bool {
             println("can't find type for left side of assignment for variable " + assignment.variable);
             false;
         };
+    };
+
+    if (!ret) {
+        println("error in assignment " + assignment2s(assignment));
     }
+
+    ret
 }
 
 isValidCondition(condition: Condition, types: Tree<string, Type>) -> bool {
@@ -147,14 +153,20 @@ isValidCondition(condition: Condition, types: Tree<string, Type>) -> bool {
         )(evalType(lhs, types), evalType(rhs, types)), false)
     };
     
-    switch (condition) {
+    ret = switch (condition) {
         True(): true;
         False(): true;
         And(lhs, rhs): isValidCondition(lhs, types) && isValidCondition(rhs, types);
         Or(lhs, rhs): isValidCondition(lhs, types) && isValidCondition(rhs, types);
         Not(cond): isValidCondition(cond, types);
         Comparison(lhs, _, rhs): isValidComparison(lhs, rhs);
+    };
+
+    if (!ret) {
+        println("error in condition " + cond2s(condition));
     }
+
+    ret
 }
 
 evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
@@ -260,7 +272,7 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
         )
     };
     
-    switch (expr) {
+    ret = switch (expr) {
         Add(lhs, rhs): evalBinopType(lhs, rhs);
         Sub(lhs, rhs): evalBinopType(lhs, rhs);
         Mul(lhs, rhs): evalBinopType(lhs, rhs);
@@ -270,6 +282,14 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
         Array(values): evalArrayType(values);
         Apply(array, index): evalApplyType(array, index);
         Update(array, index, value): evalUpdateType(array, index, value);
+    };
+
+    switch (ret) {
+        Some(r): Some(r);
+        None(): {
+            println("error in expression " + expr2s(expr));
+            None();
+        }
     }
 }
 
@@ -330,4 +350,8 @@ cond2s(cond: Condition) -> string {
         Not(inner): "!" + cond2s(inner);
         Comparison(lhs, relation, rhs): expr2s(lhs) + " " + relation2s(relation) + " " + expr2s(rhs);
     }
+}
+
+assignment2s(assignment: Assignment) -> string {
+    assignment.variable + " := " + expr2s(assignment.expr)
 }
