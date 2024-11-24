@@ -1,11 +1,12 @@
 program = ws declaration*:decls ws body:body ws { Program(:decls, :body) };
 
-expr = add | sub | mul | div | int | apply | update | array | var;
+expr = add | sub | mul | div | neg | int | apply | update | array | var;
 
 add = ws "(" ws expr:lhs ws "+" ws expr:rhs ws ")" ws { Add(:lhs, :rhs) };
 sub = ws "(" ws expr:lhs ws "-" ws expr:rhs ws ")" ws { Sub(:lhs, :rhs) };
 mul = ws "(" ws expr:lhs ws "*" ws expr:rhs ws ")" ws { Mul(:lhs, :rhs) };
 div = ws "(" ws expr:lhs ws "/" ws expr:rhs ws ")" ws { Div(:lhs, :rhs) };
+neg = ws "-" ws expr:inner ws { Neg(:inner) };
 int = integer:integer { Int(:integer) };
 var = name$name { Var($name) };
 apply = ws "app" ws "(" ws expr:array ws "," ws expr:index ws ")" ws { Apply(:array, :index) };

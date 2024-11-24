@@ -104,19 +104,26 @@ maxLabel(insns: [VMInsn]) -> int {
 }
 
 cleanEnds(insns: [VMInsn]) -> [VMInsn] {
-    removeNegatives = \array -> filter(array, \a -> a >= 0);
+    // removeNegatives = \array -> filter(array, \a -> a >= 0);
     
-    map(
-        insns,
-        \insn -> switch (insn) {
-            VMAssign(a, b, c, goto): {
-                VMAssign(a, b, c, removeNegatives(goto));
-            };
+    // map(
+    //     insns,
+    //     \insn -> switch (insn) {
+    //         VMAssign(a, b, c, goto): {
+    //             VMAssign(a, b, c, removeNegatives(goto));
+    //         };
 
-            VMIf(a, b, then, or_else): {
-                VMIf(a, b, removeNegatives(then), removeNegatives(or_else));
-            };
-        }
+    //         VMIf(a, b, then, or_else): {
+    //             VMIf(a, b, removeNegatives(then), removeNegatives(or_else));
+    //         };
+    //     }
+    // )
+
+    max_label = maxLabel(insns);
+    end_insn = VMIf(max_label, True(), [], []);
+    concat(
+        connectLabels(insns, max_label),
+        [end_insn]
     )
 }
 
