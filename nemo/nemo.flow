@@ -59,6 +59,13 @@ parseAst(input: string) -> Program {
             [
                 Pair("buildArray", \a -> Array(concat([a[0]], a[1]))),
                 Pair("buildSelection", \a -> Selection(concat([a[0]], a[1]))),
+                Pair("buildIteration", \b -> {
+                    if (length(b[0]) == 1) {
+                        Iteration(b[0][0])
+                    } else {
+                        Iteration(Sequence(b[0]))
+                    }
+                }),
             ]
         )
     )

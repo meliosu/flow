@@ -21,10 +21,10 @@ array_type = ws "[" ws type:type ws "]" ws { ArrayType(:type) };
 relation = 
       "==" { Equal() }
     | "!=" { NotEqual() }
-    | "<"  { Less() }
     | "<=" { LessOrEqual() }
-    | ">"  { Greater() }
-    | ">=" { GreaterOrEqual() };
+    | "<"  { Less() }
+    | ">=" { GreaterOrEqual() }
+    | ">"  { Greater() };
 
 condition = true | false | comparison | and | or | not;
 
@@ -33,17 +33,17 @@ false = ws "false" ws { False() };
 comparison = ws expr:lhs ws relation:relation ws expr:rhs ws { Comparison(:lhs, :relation, :rhs) };
 and = ws "(" ws condition:lhs ws "&&" ws condition:rhs ws ")" ws { And(:lhs, :rhs) };
 or = ws "(" ws condition:lhs ws "||" ws condition:rhs ws ")" ws { Or(:lhs, :rhs) };
-not = ws "!" ws condition:condition ws { Not(:condition) };
+not = ws "!" ws "(" ws condition:condition ws ")" ws { Not(:condition) };
 
 declaration = ws "var" ws name$name ws ":" ws type:type ws ";" ws { Declaration($name, :type) };
 
 body = assignment | test | iteration | sequence | selection;
 
 assignment = ws name$name ws ":=" ws expr:expr ws ";" ws { Assignment($name, :expr) };
-test = ws condition:condition ws "?" ws ";" ws { Test(:condition) };
+test = ws "(" ws condition:condition ws ")" ws "?" ws ";" ws { Test(:condition) };
 sequence = ws "{" ws body*:bodies ws "}" ws { Sequence(:bodies) };
 selection = ws "{" ws body:first (ws "U" ws body)*:other ws "}" ws { buildSelection(:first, :other) };
-iteration = ws "{" ws body:body ws "}" ws "*" ws { Iteration(:body) }; 
+iteration = ws "{" ws body*:bodies ws "}" ws "*" ws { buildIteration(:bodies) };
 
 
 ws = (" " | "\t" | "\r" | "\n")*;
