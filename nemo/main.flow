@@ -4,30 +4,95 @@ import nemo;
 import vm;
 
 main() {
-    src = "
-        var n: int;
-        var x: int;
-        var y: int;
+    test0 = "
+        var v : int;
+        var v : array of int;
+        {
+            x := (x + 1);
+            v := 1;
+            {
+                x := (x + 1) U 
+                x := (x - 1) 
+            };
+            (x < (x + 1))?;
+            x := (x + (2 * x));
+        }
+    ";
+
+    test1 = "
+        var n : int;
+        var x : int;
+        var y : int;
         {
             n := 12;
             x := 0;
             y := 0;
-            
-            {
-                {
-                    (y <= n)?;
-                    y := (y + (x + (x + 1)));
-                    x := (x + 1);
-                }*
-
-                (!(x <= y))?;
-            }
-            
+            (y <= n)?; {
+                y := (y + (x + (x + 1)));
+                x := (x + 1);
+            }*;
             x := (x - 1);
         }
     ";
 
-    program = parseAst(src);
+    test2 = "
+        var n : int;
+        var x : int;
+        var y : int;
+        {
+            x := 22; 
+            y := 15;
+            {
+                {{ (x > y)?; x := (x - y); } U
+                { (x < y)?; y := (y - x); }};
+            }*;
+            (x == y) ?;
+        }
+    ";
+
+    gcd = "
+        var x : int;
+        var y : int;
+        {
+            {
+                {{ (x > y)?; x := (x - y); } U
+                { (x < y)?; y := (y - x); }};
+            }*;
+            (x == y) ?;
+        }
+    ";
+
+    fib = "
+        var n : int;
+        var fib : array of int;
+        var i : int;
+        {
+            fib := upd(fib, 0, 1);
+            fib := upd(fib, 1, 1);
+            i := 2;
+            (i < n)?; {
+                fib := upd(fib, i, (app(fib, (i - 1)) + app(fib, (i - 2))));
+                i := (i + 1);
+            }*;
+        }
+    ";
+
+    println(parseAst(test0));
+    println("\n");
+
+    println(parseAst(test1));
+    println("\n");
+
+    println(parseAst(test2));
+    println("\n");
+
+    println(parseAst(gcd));
+    println("\n");
+
+    println(parseAst(fib));
+    println("\n");
+ 
+    program = parseAst(fib);
 
     println("nemo ast:");
     println(program);
@@ -44,7 +109,7 @@ main() {
         println(vmProgram2s(translated));
         println("\n");
 
-        vmProgramRun(translated, 500);
+        vmProgramRun(translated, 300);
     } else {
         println("NeMo is invalid");
     }

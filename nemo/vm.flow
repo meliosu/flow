@@ -20,8 +20,23 @@ export {
     VMProgram(decls: [Declaration], insns: [VMInsn]);
 }
 
+defaultValue(type: Type) -> VMValue {
+    switch (type) {
+        IntType(): VMInt(0);
+        ArrayType(inner): VMArray([]);
+    }
+}
+
 vmProgramRun(program: VMProgram, limit: int) -> void {
-    start = VMState(0, makeTree());
+    values = fold(
+        program.decls,
+        makeTree(),
+        \tree, decl -> {
+            setTree(tree, decl.variable, defaultValue(decl.type))
+        }
+    )
+
+    start = VMState(0, values);
 
     switch (vmRun(program, start, limit)) {
         Some(states): {
@@ -120,11 +135,14 @@ cleanEnds(insns: [VMInsn]) -> [VMInsn] {
     // )
 
     max_label = maxLabel(insns);
-    end_insn = VMIf(max_label, True(), [], []);
-    concat(
-        connectLabels(insns, max_label),
-        [end_insn]
-    )
+    connectLabels(insns, max_label)
+
+    // max_label = maxLabel(insns);
+    // end_insn = VMIf(max_label, True(), [], []);
+    // concat(
+    //     connectLabels(insns, max_label),
+    //     [end_insn]
+    // )
 }
 
 shiftLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
@@ -192,8 +210,13 @@ vmRun(program: VMProgram, state: VMState, limit: int) -> Maybe<Set<VMState>> {
     if (limit == 0) {
         Some(makeSet1(state));
     } else {
-        foldM(
-            insnsWithLabel(program.insns, state.pos),
+        next_insns = insnsWithLabel(program.insns, state.pos);
+
+        if (length(next_insns) == 0) {
+            Some(makeSet1(state))
+        } else {
+            foldM(
+            next_insns,
             makeSet(),
             \S, insn -> {
                 newS = switch (insn) {
@@ -252,7 +275,8 @@ vmRun(program: VMProgram, state: VMState, limit: int) -> Maybe<Set<VMState>> {
                     \idk -> mergeSets(S, idk)
                 );
             }
-        );        
+        );
+        }        
     }
 }
 
@@ -420,6 +444,7 @@ insn2s(insn: VMInsn) -> string {
 
 vmProgram2s(program: VMProgram) -> string {
     concatStrings(map(program.insns, \insn -> insn2s(insn) + "\n"))
+         + i2s(maxLabel(program.insns)) + ":\n";   
 }
 
 value2s(value: VMValue) -> string {

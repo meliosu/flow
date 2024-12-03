@@ -93,7 +93,7 @@ transformDeclarations(decls: [Declaration]) -> Maybe<Tree<string, Type>> {
 isValidProgram(program: Program) -> bool {
     switch (transformDeclarations(program.decls)) {
         Some(types): isValidBody(program.body, types);
-        None(): false;
+        None(): isValidBody(program.body, makeTree()) && false;
     }
 }
 

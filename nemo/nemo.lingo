@@ -16,7 +16,7 @@ array = ws "[" ws expr:first ("," ws expr)*:other ws "]" ws { buildArray(:first,
 type = int_type | array_type;
 
 int_type = ws "int" ws  { IntType() };
-array_type = ws "[" ws type:type ws "]" ws { ArrayType(:type) };
+array_type = ws "array of" ws type:type  ws { ArrayType(:type) };
 
 relation = 
       "==" { Equal() }
@@ -38,12 +38,13 @@ not = ws "!" ws "(" ws condition:condition ws ")" ws { Not(:condition) };
 declaration = ws "var" ws name$name ws ":" ws type:type ws ";" ws { Declaration($name, :type) };
 
 body = assignment | test | iteration | sequence | selection;
+assignment = ws name$name ws ":=" ws expr:expr ws { Assignment($name, :expr) };
+test = ws "(" ws condition:condition ws ")" ws "?" ws { Test(:condition) };
 
-assignment = ws name$name ws ":=" ws expr:expr ws ";" ws { Assignment($name, :expr) };
-test = ws "(" ws condition:condition ws ")" ws "?" ws ";" ws { Test(:condition) };
-sequence = ws "{" ws body*:bodies ws "}" ws { Sequence(:bodies) };
-selection = ws "{" ws body:first (ws "U" ws body)*:other ws "}" ws { buildSelection(:first, :other) };
-iteration = ws "{" ws body*:bodies ws "}" ws "*" ws { buildIteration(:bodies) };
+_sequence = ws body:body ws ";" ws { :body }; 
+sequence = ws "{" ws _sequence*:bodies ws "}" ws { Sequence(:bodies) };
+selection =  ws "{" ws body:first (ws "U" ws body)+:other ws "}" ws { buildSelection(:first, :other) };
+iteration = ws "{" _sequence*:bodies ws "}" ws "*" ws { buildIteration(:bodies) };
 
 
 ws = (" " | "\t" | "\r" | "\n")*;
