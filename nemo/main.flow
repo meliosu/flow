@@ -1,116 +1,40 @@
 import runtime;
 
 import nemo;
-import vm;
+import verification;
+
+// ∧
+// ∨
+// →
 
 main() {
-    test0 = "
-        var v : int;
-        var v : array of int;
+    example = "
+        {(x = a ∧ y = b)}
+        var x: int;
+        var y: int;
         {
-            x := (x + 1);
-            v := 1;
-            {
-                x := (x + 1) U 
-                x := (x - 1) 
-            };
-            (x < (x + 1))?;
-            x := (x + (2 * x));
+            x := (x + y);
+            y := (x - y);
+            x := (x - y);
         }
+        {(x = b ∧ y = a)}
     ";
 
-    test1 = "
-        var n : int;
-        var x : int;
-        var y : int;
-        {
-            n := 12;
-            x := 0;
-            y := 0;
-            (y <= n)?; {
-                y := (y + (x + (x + 1)));
-                x := (x + 1);
-            }*;
-            x := (x - 1);
-        }
-    ";
 
-    test2 = "
-        var n : int;
-        var x : int;
-        var y : int;
-        {
-            x := 22; 
-            y := 15;
-            {
-                {{ (x > y)?; x := (x - y); } U
-                { (x < y)?; y := (y - x); }};
-            }*;
-            (x == y) ?;
-        }
-    ";
+    triple = parseAst(example);
 
-    gcd = "
-        var x : int;
-        var y : int;
-        {
-            {
-                {{ (x > y)?; x := (x - y); } U
-                { (x < y)?; y := (y - x); }};
-            }*;
-            (x == y) ?;
-        }
-    ";
-
-    fib = "
-        var n : int;
-        var fib : array of int;
-        var i : int;
-        {
-            fib := upd(fib, 0, 1);
-            fib := upd(fib, 1, 1);
-            i := 2;
-            (i < n)?; {
-                fib := upd(fib, i, (app(fib, (i - 1)) + app(fib, (i - 2))));
-                i := (i + 1);
-            }*;
-        }
-    ";
-
-    println(parseAst(test0));
+    println("AST:\n");
+    println(triple);
     println("\n");
 
-    println(parseAst(test1));
-    println("\n");
+    if (isValidProgram(triple.program)) {
+        vc = findVC(triple.pre, triple.program.body, triple.post);
 
-    println(parseAst(test2));
-    println("\n");
-
-    println(parseAst(gcd));
-    println("\n");
-
-    println(parseAst(fib));
-    println("\n");
- 
-    program = parseAst(fib);
-
-    println("nemo ast:");
-    println(program);
-    println("\n");
-
-    if (isValidProgram(program)) {
-        translated = translateProgram(program);
-
-        println("vm:");
-        println(translated);
-        println("\n");
-
-        println("vm (string):");
-        println(vmProgram2s(translated));
-        println("\n");
-
-        vmProgramRun(translated, 30);
+        iterSet(
+            vc,
+            \formula -> println(cond2s(formula) + "\n")
+        );
     } else {
-        println("NeMo is invalid");
+        println("FAIL");
     }
 }

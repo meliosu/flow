@@ -3,7 +3,7 @@ import ds/tree;
 import ds/arrayutils;
 
 export {
-    parseAst(input: string) -> Program;
+    parseAst(input: string) -> HoareTriple;
     isValidProgram(program: Program) -> bool;
     expr2s(expr: Expr) -> string;
     cond2s(cond: Condition) -> string; 
@@ -32,11 +32,12 @@ export {
         Greater();
         GreaterOrEqual();
 
-    Condition ::= True, False, And, Or, Not, Comparison;
+    Condition ::= True, False, And, Or, Implies, Not, Comparison;
         True();
         False();
         And(lhs: Condition, rhs: Condition);
         Or(lhs: Condition, rhs: Condition);
+        Implies(lhs: Condition, rhs: Condition);
         Not(cond: Condition);
         Comparison(lhs: Expr, relation: Relation, rhs: Expr);
 
@@ -45,13 +46,14 @@ export {
         Test(cond: Condition);
         Sequence(bodies: [Body]);
         Selection(bodies: [Body]);
-        Iteration(body: Body);
+        Iteration(body: Body, inv: Condition);
 
     Declaration(variable: string, type: Type);
     Program(decls: [Declaration], body: Body);
+    HoareTriple(pre: Condition, program: Program, post: Condition);
 }
 
-parseAst(input: string) -> Program {
+parseAst(input: string) -> HoareTriple {
     parsic(
         compilePegGrammar("#include C:/Study/ThirdCourse/mtc/labs/nemo/nemo.lingo"),
         input,
@@ -61,9 +63,9 @@ parseAst(input: string) -> Program {
                 Pair("buildSelection", \a -> Selection(concat([a[0]], a[1]))),
                 Pair("buildIteration", \b -> {
                     if (length(b[0]) == 1) {
-                        Iteration(b[0][0])
+                        Iteration(b[0][0], b[1])
                     } else {
-                        Iteration(Sequence(b[0]))
+                        Iteration(Sequence(b[0]), b[1])
                     }
                 }),
             ]
@@ -109,7 +111,7 @@ isValidBody(body: Body, types: Tree<string, Type>) -> bool {
     switch (body) {
         Assignment(variable, expr): isValidAssignment(Assignment(variable, expr), types);
         Test(condition): isValidCondition(condition, types);
-        Iteration(inner): isValidBody(inner, types);
+        Iteration(inner, inv): isValidBody(inner, types);
         Selection(bodies): isValidBodies(bodies);
         Sequence(bodies): isValidBodies(bodies);
     }
@@ -166,6 +168,7 @@ isValidCondition(condition: Condition, types: Tree<string, Type>) -> bool {
         False(): true;
         And(lhs, rhs): isValidCondition(lhs, types) && isValidCondition(rhs, types);
         Or(lhs, rhs): isValidCondition(lhs, types) && isValidCondition(rhs, types);
+        Implies(lhs, rhs): isValidCondition(lhs, types) && isValidCondition(rhs, types);
         Not(cond): isValidCondition(cond, types);
         Comparison(lhs, _, rhs): isValidComparison(lhs, rhs);
     };
@@ -343,10 +346,10 @@ expr2s(expr: Expr) -> string {
     };
     
     switch (expr) {
-        Add(lhs, rhs): binop2s(lhs, rhs, "+");
-        Sub(lhs, rhs): binop2s(lhs, rhs, "-");
-        Mul(lhs, rhs): binop2s(lhs, rhs, "*");
-        Div(lhs, rhs): binop2s(lhs, rhs, "/");
+        Add(lhs, rhs): binop2s(lhs, rhs, " + ");
+        Sub(lhs, rhs): binop2s(lhs, rhs, " - ");
+        Mul(lhs, rhs): binop2s(lhs, rhs, " * ");
+        Div(lhs, rhs): binop2s(lhs, rhs, " / ");
         Neg(inner): "-" + expr2s(inner);
         Var(name): name;
         Int(value): i2s(value);
@@ -363,7 +366,7 @@ relation2s(relation: Relation) -> string {
         Less(): "<";
         LessOrEqual(): "<=";
         Greater(): ">";
-        GreaterOrEqual(): ">=0";
+        GreaterOrEqual(): ">=";
     }
 }
 
@@ -371,8 +374,9 @@ cond2s(cond: Condition) -> string {
     switch (cond) {
         True(): "true";
         False(): "false";
-        And(lhs, rhs): "(" + cond2s(lhs) + " && " + cond2s(rhs) + ")";
-        Or(lhs, rhs): "(" + cond2s(lhs) + " || " + cond2s(rhs) + ")";
+        And(lhs, rhs): "(" + cond2s(lhs) + " & " + cond2s(rhs) + ")";
+        Or(lhs, rhs): "(" + cond2s(lhs) + " v " + cond2s(rhs) + ")";
+        Implies(lhs, rhs): "(" + cond2s(lhs) + " -> " + cond2s(rhs) + ")";
         Not(inner): "!" + cond2s(inner);
         Comparison(lhs, relation, rhs): expr2s(lhs) + " " + relation2s(relation) + " " + expr2s(rhs);
     }

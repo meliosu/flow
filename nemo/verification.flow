@@ -1,0 +1,112 @@
+import nemo;
+
+export {
+    findVC(Condition, Body, Condition) -> Set<Condition>;
+}
+
+replaceVarCond(cond: Condition, var: string, target: Expr) -> Condition {
+    replaceVar = \c -> replaceVarCond(c, var, target);
+    binop = \lhs, rhs, f -> f(replaceVar(lhs), replaceVar(rhs));
+
+    switch (cond) {
+        True(): True();
+        False(): False();
+        And(lhs, rhs): binop(lhs, rhs, \l, r -> And(l, r));
+        Or(lhs, rhs): binop(lhs, rhs, \l, r -> Or(l, r));
+        Implies(lhs, rhs): binop(lhs, rhs, \l, r -> Implies(l, r));
+        Not(inner): Not(replaceVar(inner));
+        Comparison(lhs, relation, rhs): {
+            Comparison(
+                replaceVarExpr(lhs, var, target),
+                relation,
+                replaceVarExpr(rhs, var, target)
+            )
+        };
+    }
+}
+
+replaceVarExpr(expr: Expr, var: string, target: Expr) -> Expr {
+    replaceVar = \e -> replaceVarExpr(e, var, target);
+    binop = \lhs, rhs, f -> f(replaceVar(lhs), replaceVar(rhs));
+    
+    switch (expr) {
+        Add(lhs, rhs): binop(lhs, rhs, \l, r -> Add(l, r));
+        Sub(lhs, rhs): binop(lhs, rhs, \l, r -> Sub(l, r));
+        Mul(lhs, rhs): binop(lhs, rhs, \l, r -> Mul(l, r));
+        Div(lhs, rhs): binop(lhs, rhs, \l, r -> Div(l, r));
+        Neg(inner): Neg(replaceVar(inner));
+        Int(value): Int(value);
+        Var(name): if (name == var) { target } else { Var(name) };
+        Update(array, index, value): {
+            Update(
+                replaceVar(array),
+                replaceVar(index),
+                replaceVar(value)
+            )
+        };
+        Apply(array, index): {
+            Apply(
+                replaceVar(array),
+                replaceVar(index)
+            )
+        };
+        Array(values): {
+            Array(map(values, replaceVar))
+        };
+    }
+}
+
+findVC(pre: Condition, body: Body, post: Condition) -> Set<Condition> {
+    switch (body) {
+        Assignment(var, expr): makeSet1(
+            Implies(
+                pre,
+                replaceVarCond(post, var, expr)
+            )
+        );
+
+        Test(cond): makeSet1(
+            Implies(
+                pre,
+                Implies(
+                    cond,
+                    post
+                )
+            )
+        );
+
+        Sequence(bodies): {
+            if (length(bodies) == 1) {
+                findVC(pre, bodies[0], post)
+            } else {
+                alpha = Sequence(subrange(bodies, 0, length(bodies) - 1));
+                beta = bodies[length(bodies) - 1];
+
+                foldSet(
+                    findVC(True(), beta, post),
+                    makeSet(),
+                    \set, formula -> {
+                        mergeSets(
+                            set,
+                            findVC(pre, alpha, formula)
+                        )
+                    }
+                )
+            }
+        }
+
+        Selection(bodies): fold(
+            bodies,
+            makeSet(),
+            \set, b -> mergeSets(
+                set,
+                findVC(pre, b, post)
+            )
+        );
+
+        Iteration(inner, inv): insertSet(
+            findVC(inv, inner, inv),
+            Implies(pre, inv)
+        );
+    }
+}
