@@ -2,14 +2,17 @@ import runtime;
 
 import nemo;
 import verification;
+import z3;
 
 // ∧
 // ∨
 // →
 
 main() {
-    example = "
+    example1 = "
         {(x = a ∧ y = b)}
+        var a: int;
+        var b: int;
         var x: int;
         var y: int;
         {
@@ -20,6 +23,27 @@ main() {
         {(x = b ∧ y = a)}
     ";
 
+    example = "
+        {n >= 0}
+        var n: int;
+        var x: int;
+        var y: int;
+        {
+            n := 12;
+            x := 0;
+            y := 0;
+            {
+                {
+                    (y <= n)?;
+                    y := (y + (x + (x + 1)));
+                    x := (x + 1);
+                }* {true};
+                (!(y <= n))?;
+            };
+            x := (x - 1);
+        }
+        {( (x * x) <= n && ((x + 1) * (x + 1)) > n )}
+    ";
 
     triple = parseAst(example);
 
@@ -34,6 +58,11 @@ main() {
             vc,
             \formula -> println(cond2s(formula) + "\n")
         );
+
+        z3 = translateZ3(triple, set2array(vc));
+
+        println("Z3:");
+        println(z3);
     } else {
         println("FAIL");
     }

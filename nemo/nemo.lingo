@@ -47,7 +47,7 @@ test = ws "(" ws condition:condition ws ")" ws "?" ws { Test(:condition) };
 _sequence = ws body:body ws ";" ws { :body }; 
 sequence = ws "{" ws _sequence*:bodies ws "}" ws { Sequence(:bodies) };
 selection =  ws "{" ws body:first (ws "U" ws body)+:other ws "}" ws { buildSelection(:first, :other) };
-iteration = ws "{" ws condition:inv ws "}" ws "{" _sequence*:bodies ws "}" ws "*" ws { buildIteration(:bodies, :inv) };
+iteration = ws "{" _sequence*:bodies ws "}" ws "*" ws "{" ws condition:inv ws "}" ws { buildIteration(:bodies, :inv) };
 
 
 ws = (" " | "\t" | "\r" | "\n")*;

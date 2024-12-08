@@ -68,5 +68,22 @@ formulaZ3(formula: Condition) -> string {
 }
 
 translateZ3(triple: HoareTriple, formulas: [Condition]) -> string {
-    "todo"
+    strGlue(
+        concat(
+            map(
+                triple.program.decls,
+                declZ3
+            ),
+            map(
+                formulas,
+                \formula -> {
+                    "(push)\n"
+                        + "(assert " + formulaZ3(Not(formula)) + ")\n"
+                        + "(check-sat)\n"
+                        + "(pop)" 
+                }
+            )
+        ),
+        "\n"
+    )
 }
