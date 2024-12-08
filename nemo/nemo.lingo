@@ -40,7 +40,6 @@ declaration = ws "var" ws name$name ws ":" ws type:type ws ";" ws { Declaration(
 body = assignment | test | iteration | sequence | selection;
 assignment = ws name$name ws ":=" ws expr:expr ws { Assignment($name, :expr) };
 test = ws "(" ws condition:condition ws ")" ws "?" ws { Test(:condition) };
-
 _sequence = ws body:body ws ";" ws { :body }; 
 sequence = ws "{" ws _sequence*:bodies ws "}" ws { Sequence(:bodies) };
 selection =  ws "{" ws body:first (ws "U" ws body)+:other ws "}" ws { buildSelection(:first, :other) };

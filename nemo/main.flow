@@ -109,7 +109,7 @@ main() {
         println(vmProgram2s(translated));
         println("\n");
 
-        vmProgramRun(translated, 300);
+        vmProgramRun(translated, 30);
     } else {
         println("NeMo is invalid");
     }

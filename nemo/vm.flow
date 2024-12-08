@@ -53,31 +53,31 @@ vmProgramRun(program: VMProgram, limit: int) -> void {
 }
 
 translateProgram(program: Program) -> VMProgram {
-    VMProgram(program.decls, cleanEnds(translateBody(program.body)))
+    // VMProgram(program.decls, cleanEnds(translateBody(program.body)))
+    VMProgram(program.decls, _translateBody(program.body))
 }
 
-translateBody(b: Body) -> [VMInsn] {
+_translateBody(b: Body) -> [VMInsn] {
     switch (b) {
-        Assignment(variable, expr): {
-            [VMAssign(0, variable, expr, [-1])]
+        Assignment(var, expr): {
+            [VMAssign(0, var, expr, [1])]
         }
 
         Test(cond): {
-            [VMIf(0, cond, [-1], [])]
+            [VMIf(0, cond, [1], [])]
         }
 
         Sequence(bodies): {
             fold(
-                map(bodies, \body -> translateBody(body)),
+                map(bodies, _translateBody),
                 [],
                 \result, body -> {
                     if (length(result) == 0) {
                         body
                     } else {
-                        shift = maxLabel(result);
-                        shifted = shiftLabels(body, shift);
-                        connected = connectLabels(result, shift);
-                        concat(connected, shifted);
+                        end = _endOf(result);
+                        shifted = _shiftLabels(body, end);
+                        concat(result, shifted)
                     }
                 }
             )
@@ -85,27 +85,139 @@ translateBody(b: Body) -> [VMInsn] {
 
         Selection(bodies): {
             fold(
-                map(bodies, \body -> translateBody(body)),
+                map(bodies, _translateBody),
                 [],
                 \result, body -> {
-                    shift = maxLabel(result);
-                    shifted = shiftNonZeroLabels(body, shift);
-                    concat(result, shifted);
+                    if (length(result) == 0) {
+                        body
+                    } else {
+                        shifted_result = _shiftLabels(result, 1);
+                        end_result = _endOf(shifted_result);
+                        
+                        shifted_body = _shiftLabels(body, end_result);
+                        end_body = _endOf(shifted_body);
+
+                        result_replaced = _replaceLabel(shifted_result, end_result, end_body);
+
+                        concat3(
+                            [VMIf(0, True(), [1, end_result], [])],
+                            result_replaced,
+                            shifted_body  
+                        )
+                    }
                 }
             )
         }
 
-        Iteration(inner): {
-            translated = translateBody(inner);
-
-            // TODO: change
-            if_insn = VMIf(0, True(), [1, -1], []);
-            shifted = shiftLabels(translated, 1);
-            connected = connectLabels(shifted, 0);
-            concat([if_insn], connected);
+        Iteration(body): {
+            translated = _translateBody(body);
+            shifted = _shiftLabels(translated, 1);
+            end = _endOf(shifted);
+            shifted_replaced = _replaceLabel(shifted, end, 0);
+            concat(
+                [VMIf(0, True(), [1, end], [])],
+                shifted_replaced
+            )
         }
     }
 }
+
+_endOf(insns: [VMInsn]) -> int {
+    if (length(insns) == 0) {
+        1
+    } else {
+        either(maxA(map(insns, insnLabel)), 0) + 1
+    }
+}
+
+_shiftLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
+    shiftArray = \array -> map(array, \i -> i + shift);
+
+    map(
+        insns,
+        \insn -> switch (insn) {
+            VMAssign(label, var, expr, goto): VMAssign(label + shift, var, expr, shiftArray(goto));
+            VMIf(label, cond, then, orelse): VMIf(label + shift, cond, shiftArray(then), shiftArray(orelse));
+        }
+    )
+}
+
+_replaceLabel(insns: [VMInsn], label: int, target: int) -> [VMInsn] {
+    replaceArray = \array -> map(array, \i -> if (i == label) { target } else { i });
+
+    map(
+        insns,
+        \insn -> switch (insn) {
+            VMAssign(lab, var, expr, goto): {
+                VMAssign(
+                    if (label == lab) { target } else { lab },
+                    var,
+                    expr,
+                    replaceArray(goto)
+                )
+            }
+
+            VMIf(lab, cond, then, orelse): {
+                VMIf(
+                    if (label == lab) { target } else { lab },
+                    cond,
+                    replaceArray(then),
+                    replaceArray(orelse),
+                )
+            }
+        }
+    )
+}
+
+// translateBody(b: Body) -> [VMInsn] {
+//     switch (b) {
+//         Assignment(variable, expr): {
+//             [VMAssign(0, variable, expr, [-1])]
+//         }
+
+//         Test(cond): {
+//             [VMIf(0, cond, [-1], [])]
+//         }
+
+//         Sequence(bodies): {
+//             fold(
+//                 map(bodies, \body -> translateBody(body)),
+//                 [],
+//                 \result, body -> {
+//                     if (length(result) == 0) {
+//                         body
+//                     } else {
+//                         shift = maxLabel(result);
+//                         shifted = shiftLabels(body, shift);
+//                         connected = connectLabels(result, shift);
+//                         concat(connected, shifted);
+//                     }
+//                 }
+//             )
+//         }
+
+//         Selection(bodies): {
+//             fold(
+//                 map(bodies, \body -> translateBody(body)),
+//                 [],
+//                 \result, body -> {
+//                     shift = maxLabel(result);
+//                     shifted = shiftNonZeroLabels(body, shift);
+//                     concat(result, shifted);
+//                 }
+//             )
+//         }
+
+//         Iteration(inner): {
+//             translated = translateBody(inner);
+
+//             if_insn = VMIf(0, True(), [1, -1], []);
+//             shifted = shiftLabels(translated, 1);
+//             connected = connectLabels(shifted, 0);
+//             concat([if_insn], connected);
+//         }
+//     }
+// }
 
 insnLabel(insn: VMInsn) -> int {
     switch (insn) {
@@ -118,7 +230,7 @@ maxLabel(insns: [VMInsn]) -> int {
     maxAFnDef(insns, \insn -> insnLabel(insn), 0) + 1
 }
 
-cleanEnds(insns: [VMInsn]) -> [VMInsn] {
+// cleanEnds(insns: [VMInsn]) -> [VMInsn] {
     // removeNegatives = \array -> filter(array, \a -> a >= 0);
     
     // map(
@@ -134,8 +246,8 @@ cleanEnds(insns: [VMInsn]) -> [VMInsn] {
     //     }
     // )
 
-    max_label = maxLabel(insns);
-    connectLabels(insns, max_label)
+    // max_label = maxLabel(insns);
+    // connectLabels(insns, max_label)
 
     // max_label = maxLabel(insns);
     // end_insn = VMIf(max_label, True(), [], []);
@@ -143,64 +255,64 @@ cleanEnds(insns: [VMInsn]) -> [VMInsn] {
     //     connectLabels(insns, max_label),
     //     [end_insn]
     // )
-}
+// }
 
-shiftLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
-    doShift = \array -> {
-        map(array, \a -> if (a >= 0) { a + shift } else { a })
-    };
+// shiftLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
+//     doShift = \array -> {
+//         map(array, \a -> if (a >= 0) { a + shift } else { a })
+//     };
     
-    map(
-        insns,
-        \insn -> switch (insn) {
-            VMAssign(label, var, expr, goto): {
-                VMAssign(label + shift, var, expr, doShift(goto))
-            };
+//     map(
+//         insns,
+//         \insn -> switch (insn) {
+//             VMAssign(label, var, expr, goto): {
+//                 VMAssign(label + shift, var, expr, doShift(goto))
+//             };
 
-            VMIf(label, cond, then, or_else): {
-                VMIf(label + shift, cond, doShift(then), doShift(or_else))
-            };
-        }
-    )
-}
+//             VMIf(label, cond, then, or_else): {
+//                 VMIf(label + shift, cond, doShift(then), doShift(or_else))
+//             };
+//         }
+//     )
+// }
 
-shiftNonZeroLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
-    shiftJumps = \array -> {
-        map(array, \a -> if (a > 0) { a + shift } else { a })
-    };
+// shiftNonZeroLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
+//     shiftJumps = \array -> {
+//         map(array, \a -> if (a > 0) { a + shift } else { a })
+//     };
 
-    shiftLabel = \label -> if (label > 0) { label + shift } else { label };
+//     shiftLabel = \label -> if (label > 0) { label + shift } else { label };
 
-    map(
-        insns,
-        \insn -> switch (insn) {
-            VMAssign(label, var, expr, goto): {
-                VMAssign(shiftLabel(label), var, expr, shiftJumps(goto))
-            };
+//     map(
+//         insns,
+//         \insn -> switch (insn) {
+//             VMAssign(label, var, expr, goto): {
+//                 VMAssign(shiftLabel(label), var, expr, shiftJumps(goto))
+//             };
 
-            VMIf(label, cond, then, or_else): {
-                VMIf(shiftLabel(label), cond, shiftJumps(then), shiftJumps(or_else))
-            };
-        }
-    )
-}
+//             VMIf(label, cond, then, or_else): {
+//                 VMIf(shiftLabel(label), cond, shiftJumps(then), shiftJumps(or_else))
+//             };
+//         }
+//     )
+// }
 
-connectLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
-    replaceEnds = \array -> map(array, \a -> if (a == -1) { shift } else { a });
+// connectLabels(insns: [VMInsn], shift: int) -> [VMInsn] {
+//     replaceEnds = \array -> map(array, \a -> if (a == -1) { shift } else { a });
     
-    map(
-        insns,
-        \insn -> switch (insn) {
-            VMAssign(label, var, expr, goto): {
-                VMAssign(label, var, expr, replaceEnds(goto));
-            };
+//     map(
+//         insns,
+//         \insn -> switch (insn) {
+//             VMAssign(label, var, expr, goto): {
+//                 VMAssign(label, var, expr, replaceEnds(goto));
+//             };
 
-            VMIf(label, cond, then, or_else): {
-                VMIf(label, cond, replaceEnds(then), replaceEnds(or_else));
-            };
-        }
-    )
-}
+//             VMIf(label, cond, then, or_else): {
+//                 VMIf(label, cond, replaceEnds(then), replaceEnds(or_else));
+//             };
+//         }
+//     )
+// }
 
 insnsWithLabel(insns: [VMInsn], label: int) -> [VMInsn] {
     filter(insns, \insn -> insnLabel(insn) == label)
