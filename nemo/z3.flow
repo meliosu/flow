@@ -4,6 +4,17 @@ export {
     translateZ3(triple: HoareTriple, formulas: [Condition]) -> string;
 }
 
+typeZ3(type: Type) -> string {
+    switch (type) {
+        IntType(): "Int";
+        ArrayType(inner): "(Array " + typeZ3(inner) + " Int)"; 
+    }
+}
+
+declZ3(decl: Declaration) -> string {
+    "(declare-const " + decl.variable + " " + typeZ3(decl.type) + ")"
+}
+
 exprZ3(expr: Expr) -> string {
     binop = \lhs, sign, rhs -> {
         "(" + sign + " " + exprZ3(lhs) + " " + exprZ3(rhs) + ")"
