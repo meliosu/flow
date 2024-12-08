@@ -1,3 +1,6 @@
+hoare_triple = ws "{" ws condition:pre ws "}" ws program:program ws "{" ws condition:post ws "}" ws 
+  { HoareTriple(:pre, :program, :post) }; 
+
 program = ws declaration*:decls ws body:body ws { Program(:decls, :body) };
 
 expr = add | sub | mul | div | neg | int | apply | update | array | var;
@@ -19,20 +22,21 @@ int_type = ws "int" ws  { IntType() };
 array_type = ws "array of" ws type:type  ws { ArrayType(:type) };
 
 relation = 
-      "==" { Equal() }
+      "=" { Equal() }
     | "!=" { NotEqual() }
     | "<=" { LessOrEqual() }
     | "<"  { Less() }
     | ">=" { GreaterOrEqual() }
     | ">"  { Greater() };
 
-condition = true | false | comparison | and | or | not;
+condition = true | false | comparison | and | or | implies | not;
 
 true = ws "true" ws { True() };
 false = ws "false" ws { False() }; 
 comparison = ws expr:lhs ws relation:relation ws expr:rhs ws { Comparison(:lhs, :relation, :rhs) };
-and = ws "(" ws condition:lhs ws "&&" ws condition:rhs ws ")" ws { And(:lhs, :rhs) };
-or = ws "(" ws condition:lhs ws "||" ws condition:rhs ws ")" ws { Or(:lhs, :rhs) };
+and = ws "(" ws condition:lhs ws ("&&" | "∧") ws condition:rhs ws ")" ws { And(:lhs, :rhs) };
+or = ws "(" ws condition:lhs ws ("||" | "∨") ws condition:rhs ws ")" ws { Or(:lhs, :rhs) };
+implies = ws "(" ws condition:lhs ws "->" ws condition:rhs ws ")" ws { Implies(:lhs, :rhs) };
 not = ws "!" ws "(" ws condition:condition ws ")" ws { Not(:condition) };
 
 declaration = ws "var" ws name$name ws ":" ws type:type ws ";" ws { Declaration($name, :type) };
@@ -43,7 +47,7 @@ test = ws "(" ws condition:condition ws ")" ws "?" ws { Test(:condition) };
 _sequence = ws body:body ws ";" ws { :body }; 
 sequence = ws "{" ws _sequence*:bodies ws "}" ws { Sequence(:bodies) };
 selection =  ws "{" ws body:first (ws "U" ws body)+:other ws "}" ws { buildSelection(:first, :other) };
-iteration = ws "{" _sequence*:bodies ws "}" ws "*" ws { buildIteration(:bodies) };
+iteration = ws "{" ws condition:inv ws "}" ws "{" _sequence*:bodies ws "}" ws "*" ws { buildIteration(:bodies, :inv) };
 
 
 ws = (" " | "\t" | "\r" | "\n")*;

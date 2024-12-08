@@ -1,0 +1,61 @@
+import nemo;
+
+export {
+    translateZ3(triple: HoareTriple, formulas: [Condition]) -> string;
+}
+
+exprZ3(expr: Expr) -> string {
+    binop = \lhs, sign, rhs -> {
+        "(" + sign + " " + exprZ3(lhs) + " " + exprZ3(rhs) + ")"
+    };
+    
+    switch (expr) {
+        Add(lhs, rhs): binop(lhs, "+", rhs);
+        Sub(lhs, rhs): binop(lhs, "-", rhs);
+        Mul(lhs, rhs): binop(lhs, "*", rhs);
+        Div(lhs, rhs): binop(lhs, "/", rhs);
+        Neg(inner): exprZ3(Sub(Int(0), inner));
+        Int(value): i2s(value);
+        Var(name): name;
+        Update(array, index, value): {
+            "(store " + exprZ3(array) + " " + exprZ3(index) + " " + exprZ3(value) + ")"
+        };
+        Apply(array, index): {
+            "(select " + exprZ3(array) + " " + exprZ3(index) + ")"
+        };
+        Array(values): {
+            "[" + strGlue(map(values, exprZ3), ", ") + "]"
+        };
+    }
+}
+
+formulaZ3(formula: Condition) -> string {
+    comparison = \lhs, sign, rhs -> {
+        "(" + sign + " " + exprZ3(lhs) + " " + exprZ3(rhs) + ")"
+    };
+
+    binary = \lhs, sign, rhs -> {
+        "(" + sign + " " + formulaZ3(lhs) + " " + formulaZ3(rhs) + ")"
+    };
+    
+    switch (formula) {
+        True(): "true";
+        False(): "false";
+        And(lhs, rhs): binary(lhs, "and", rhs);
+        Or(lhs, rhs): binary(lhs, "or", rhs);
+        Implies(lhs, rhs): binary(lhs, "=>", rhs);
+        Not(inner): "(not " + formulaZ3(inner) + ")";
+        Comparison(lhs, relation, rhs): switch (relation) {
+            Equal(): comparison(lhs, "=", rhs);
+            NotEqual(): "(not " + comparison(lhs, "=", rhs) + ")";
+            Less(): comparison(lhs, "<", rhs);
+            LessOrEqual(): comparison(lhs, "<=", rhs);
+            Greater(): comparison(lhs, ">", rhs);
+            GreaterOrEqual(): comparison(lhs, ">=", rhs);
+        }
+    }
+}
+
+translateZ3(triple: HoareTriple, formulas: [Condition]) -> string {
+    "todo"
+}
