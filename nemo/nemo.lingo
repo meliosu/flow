@@ -12,14 +12,14 @@ div = ws "(" ws expr:lhs ws "/" ws expr:rhs ws ")" ws { Div(:lhs, :rhs) };
 neg = ws "-" ws expr:inner ws { Neg(:inner) };
 int = integer:integer { Int(:integer) };
 var = name$name { Var($name) };
-apply = ws "app" ws "(" ws expr:array ws "," ws expr:index ws ")" ws { Apply(:array, :index) };
-update = ws "upd" ws "(" ws expr:array ws "," ws expr:index ws "," ws expr:value ws ")" ws { Update(:array, :index, :value) };
+apply = ws "APP" ws "(" ws expr:array ws "," ws expr:index ws ")" ws { Apply(:array, :index) };
+update = ws "UPD" ws "(" ws expr:array ws "," ws expr:index ws "," ws expr:value ws ")" ws { Update(:array, :index, :value) };
 array = ws "[" ws expr:first ("," ws expr)*:other ws "]" ws { buildArray(:first, :other) };
 
 type = int_type | array_type;
 
-int_type = ws "int" ws  { IntType() };
-array_type = ws "array of" ws type:type  ws { ArrayType(:type) };
+int_type = ws "INT" ws  { IntType() };
+array_type = ws "INT ARRAY OF" ws type:type  ws { ArrayType(:type) };
 
 relation = 
       "=" { Equal() }
@@ -31,15 +31,15 @@ relation =
 
 condition = true | false | comparison | and | or | implies | not;
 
-true = ws "true" ws { True() };
-false = ws "false" ws { False() }; 
+true = ws "TRUE" ws { True() };
+false = ws "FALSE" ws { False() }; 
 comparison = ws expr:lhs ws relation:relation ws expr:rhs ws { Comparison(:lhs, :relation, :rhs) };
 and = ws "(" ws condition:lhs ws ("&&" | "∧") ws condition:rhs ws ")" ws { And(:lhs, :rhs) };
 or = ws "(" ws condition:lhs ws ("||" | "∨") ws condition:rhs ws ")" ws { Or(:lhs, :rhs) };
 implies = ws "(" ws condition:lhs ws "->" ws condition:rhs ws ")" ws { Implies(:lhs, :rhs) };
 not = ws "!" ws "(" ws condition:condition ws ")" ws { Not(:condition) };
 
-declaration = ws "var" ws name$name ws ":" ws type:type ws ";" ws { Declaration($name, :type) };
+declaration = ws "VAR" ws name$name ws ":" ws type:type ws ";" ws { Declaration($name, :type) };
 
 body = assignment | test | iteration | sequence | selection;
 assignment = ws name$name ws ":=" ws expr:expr ws { Assignment($name, :expr) };
