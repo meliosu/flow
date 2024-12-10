@@ -1,7 +1,7 @@
 import nemo;
 
 export {
-    translateZ3(triple: HoareTriple, formulas: [Condition]) -> string;
+    translateZ3(triple: HoareTriple, formulas: [Condition]) -> Maybe<string>;
 }
 
 typeZ3(type: Type) -> string {
@@ -67,23 +67,26 @@ formulaZ3(formula: Condition) -> string {
     }
 }
 
-translateZ3(triple: HoareTriple, formulas: [Condition]) -> string {
-    strGlue(
-        concat(
-            map(
-                triple.program.decls,
-                declZ3
+translateZ3(triple: HoareTriple, formulas: [Condition]) -> Maybe<string> {
+    maybeMap(
+        inferTypes(triple.program.decls, formulas),
+        \types -> strGlue(
+            concat3(
+                map(
+                    tree2pairs(types),
+                    \pair -> declZ3(Declaration(pair.first, pair.second))
+                ),
+                map(
+                    formulas,
+                    \formula -> "(assert " + formulaZ3(Not(formula)) + ")"
+                ),
+                ["(check-sat)"]
             ),
-            map(
-                formulas,
-                \formula -> {
-                    "(push)\n"
-                        + "(assert " + formulaZ3(Not(formula)) + ")\n"
-                        + "(check-sat)\n"
-                        + "(pop)" 
-                }
-            )
-        ),
-        "\n"
+            "\n"
+        )
     )
+}
+
+inferTypes(decls: [Declaration], formulas: [Condition]) -> Maybe<Tree<string>> {
+    // todo
 }

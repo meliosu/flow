@@ -1,4 +1,4 @@
-hoare_triple = ws "{" ws condition:pre ws "}" ws program:program ws "{" ws condition:post ws "}" ws 
+hoare_triple = ws "{" ws condition:pre ws "}" ws "{" ws program:program ws "}" ws "{" ws condition:post ws "}" ws 
   { HoareTriple(:pre, :program, :post) }; 
 
 program = ws declaration*:decls ws body:body ws { Program(:decls, :body) };
@@ -47,7 +47,7 @@ test = ws "(" ws condition:condition ws ")" ws "?" ws { Test(:condition) };
 _sequence = ws body:body ws ";" ws { :body }; 
 sequence = ws "{" ws _sequence*:bodies ws "}" ws { Sequence(:bodies) };
 selection =  ws "{" ws body:first (ws "U" ws body)+:other ws "}" ws { buildSelection(:first, :other) };
-iteration = ws "{" _sequence*:bodies ws "}" ws "*" ws "{" ws condition:inv ws "}" ws { buildIteration(:bodies, :inv) };
+iteration = ws "{" ws condition:inv ws "}" ws "{" _sequence*:bodies ws "}" ws "*"  ws { buildIteration(:bodies, :inv) };
 
 
 ws = (" " | "\t" | "\r" | "\n")*;

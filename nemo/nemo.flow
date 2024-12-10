@@ -361,7 +361,7 @@ expr2s(expr: Expr) -> string {
 
 relation2s(relation: Relation) -> string {
     switch (relation) {
-        Equal(): "==";
+        Equal(): "=";
         NotEqual(): "!=";
         Less(): "<";
         LessOrEqual(): "<=";
@@ -377,7 +377,7 @@ cond2s(cond: Condition) -> string {
         And(lhs, rhs): "(" + cond2s(lhs) + " & " + cond2s(rhs) + ")";
         Or(lhs, rhs): "(" + cond2s(lhs) + " v " + cond2s(rhs) + ")";
         Implies(lhs, rhs): "(" + cond2s(lhs) + " -> " + cond2s(rhs) + ")";
-        Not(inner): "!" + cond2s(inner);
+        Not(inner): "!(" + cond2s(inner)+ ")";
         Comparison(lhs, relation, rhs): expr2s(lhs) + " " + relation2s(relation) + " " + expr2s(rhs);
     }
 }

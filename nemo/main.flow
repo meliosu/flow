@@ -9,38 +9,42 @@ import z3;
 // →
 
 main() {
-    example1 = "
+    example = "
         {(x = a ∧ y = b)}
-        VAR a: INT;
-        VAR b: INT;
-        VAR x: INT;
-        VAR y: INT;
         {
-            x := (x + y);
-            y := (x - y);
-            x := (x - y);
+            VAR a: INT;
+            VAR b: INT;
+            VAR x: INT;
+            VAR y: INT;
+            {
+                x := (x + y);
+                y := (x - y);
+                x := (x - y);
+            }
         }
         {(x = b ∧ y = a)}
     ";
 
-    example = "
+    example1 = "
         {n >= 0}
-        VAR n: INT;
-        VAR x: INT;
-        VAR y: INT;
         {
-            n := 12;
-            x := 0;
-            y := 0;
+            VAR n: INT;
+            VAR x: INT;
+            VAR y: INT;
             {
+                n := 12;
+                x := 0;
+                y := 0;
                 {
-                    (y <= n)?;
-                    y := (y + (x + (x + 1)));
-                    x := (x + 1);
-                }* {TRUE};
-                (!(y <= n))?;
-            };
-            x := (x - 1);
+                    {y <= n} {
+                        (y <= n)?;
+                        y := (y + (x + (x + 1)));
+                        x := (x + 1);
+                    }*;
+                    (!(y <= n))?;
+                };
+                x := (x - 1);
+            }
         }
         {((x * x) <= n ∧ ((x + 1) * (x + 1)) > n)}
     ";
@@ -54,15 +58,22 @@ main() {
     if (isValidProgram(triple.program)) {
         vc = findVC(triple.pre, triple.program.body, triple.post);
 
+        println("Verification Conditions:");
         iterSet(
             vc,
             \formula -> println(cond2s(formula) + "\n")
         );
 
-        z3 = translateZ3(triple, set2array(vc));
+        switch (translateZ3(triple, set2array(vc))) {
+            Some(z3): {
+                println("Z3:");
+                println(z3);
+            }
 
-        println("Z3:");
-        println(z3);
+            None(): {
+                println("Error translating to Z3");
+            }
+        }
     } else {
         println("FAIL");
     }
