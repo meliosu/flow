@@ -42,7 +42,7 @@ main() {
             };
             x := (x - 1);
         }
-        {( (x * x) <= n ∧ ((x + 1) * (x + 1)) > n )}
+        {((x * x) <= n ∧ ((x + 1) * (x + 1)) > n)}
     ";
 
     triple = parseAst(example);
