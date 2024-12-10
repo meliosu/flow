@@ -87,6 +87,59 @@ translateZ3(triple: HoareTriple, formulas: [Condition]) -> Maybe<string> {
     )
 }
 
-inferTypes(decls: [Declaration], formulas: [Condition]) -> Maybe<Tree<string>> {
-    // todo
+// Merge Trees, return None() if any keys match but values are not equal
+maybeMerge(first: Tree<?, ??>, second: Tree<?, ??>) -> Maybe<Tree<?, ??>> {
+    foldTree(
+        second,
+        Some(first),
+        \key, value, result -> {
+            maybeBind(
+                result,
+                \tree -> {
+                    switch (lookupTree(tree, key)) {
+                        Some(looked_up): if (looked_up == value) {
+                            Some(tree)
+                        } else {
+                            None()
+                        };
+
+                        None(): Some(setTree(tree, key, value));
+                    }
+                }
+            )
+        }
+    )
+}
+
+inferTypes(decls: [Declaration], formulas: [Condition]) -> Maybe<Tree<string, Type>> {
+    declared = fold(
+        decls,
+        makeTree(),
+        \types, decl -> setTree(types, decl.variable, decl.type)
+    );
+
+    foldM(
+        formulas,
+        declared,
+        \types, formula -> maybeBind(
+            inferTypesCond(declared, formula),
+            \formula_types -> maybeMerge(types, formula_types)
+        )
+    )
+}
+
+inferTypesCond(decls: Tree<string, Type>, formula: Condition) -> Maybe<Tree<string, Type>> {
+    switch (formula) {
+        True(): Some(makeTree());
+        False(): Some(makeTree());
+        And(lhs, rhs):
+        Or(lhs, rhs):
+        Implies(lhs, rhs):
+        Not(inner):
+        Comparison(lhs, relation, rhs):
+    }
+}
+
+inferTypesExpr(decls: Tree<string, Type>, expr: Expr, suggested: Type) -> Maybe<Tree<string, Type>> {
+
 }
