@@ -7,7 +7,7 @@ export {
 typeZ3(type: Type) -> string {
     switch (type) {
         IntType(): "Int";
-        ArrayType(inner): "(Array " + typeZ3(inner) + " Int)"; 
+        ArrayType(base, index): "(Array " + typeZ3(base) + " " + typeZ3(index) + ")"; 
     }
 }
 
@@ -129,17 +129,108 @@ inferTypes(decls: [Declaration], formulas: [Condition]) -> Maybe<Tree<string, Ty
 }
 
 inferTypesCond(decls: Tree<string, Type>, formula: Condition) -> Maybe<Tree<string, Type>> {
+    binop = \lhs, rhs -> {
+        maybeBind2(
+            \l, r -> maybeMerge(l, r)
+        )(
+            inferTypesCond(decls, lhs),
+            inferTypesCond(decls, rhs)
+        )
+    };
+
     switch (formula) {
         True(): Some(makeTree());
         False(): Some(makeTree());
-        And(lhs, rhs):
-        Or(lhs, rhs):
-        Implies(lhs, rhs):
-        Not(inner):
-        Comparison(lhs, relation, rhs):
+        And(lhs, rhs): binop(lhs, rhs);
+        Or(lhs, rhs): binop(lhs, rhs);
+        Implies(lhs, rhs): binop(lhs, rhs);
+        Not(inner): inferTypesCond(decls, inner);
+        Comparison(lhs, relation, rhs): maybeBind2(
+            \l, r -> maybeMerge(l, r)
+        )(
+            inferTypesExpr(decls, lhs, IntType()), 
+            inferTypesExpr(decls, rhs, IntType())
+        );
     }
 }
 
 inferTypesExpr(decls: Tree<string, Type>, expr: Expr, suggested: Type) -> Maybe<Tree<string, Type>> {
+    binop = \lhs, rhs -> {
+        if (suggested == IntType()) {
+            maybeBind2(
+                \l, r -> maybeMerge(l, r)
+            )(
+                inferTypesExpr(decls, lhs, IntType()), 
+                inferTypesExpr(decls, rhs, IntType())
+            )
+        } else {
+            None()
+        }
+    };
 
+    unary = \e -> {
+        if (suggested == IntType()) {
+            inferTypesExpr(decls, e, IntType())
+        } else {
+            None()
+        }
+    };
+    
+    switch (expr) {
+        Add(lhs, rhs): binop(lhs, rhs);
+        Sub(lhs, rhs): binop(lhs, rhs);
+        Mul(lhs, rhs): binop(lhs, rhs);
+        Div(lhs, rhs): binop(lhs, rhs);
+        Neg(inner): unary(inner);
+        Int(value): Some(makeTree());
+        Var(name): Some(makeTree1(name, suggested));
+        Update(array, index, value): switch (suggested) {
+            ArrayType(base_ty, index_ty): {
+                maybeBind(
+                    inferTypesExpr(decls, array, suggested),
+                    \array_types -> maybeBind(
+                        inferTypesExpr(decls, index, index_ty),
+                        \index_types -> maybeBind(
+                            inferTypesExpr(decls, value, base_ty),
+                            \value_types -> maybeBind(
+                                maybeMerge(array_types, index_types),
+                                \merged_types -> maybeMerge(
+                                    merged_types, value_types
+                                )
+                            )
+                        )
+                    )
+                )
+            };
+
+            IntType(): None();
+        };
+
+        Apply(array, index): maybeBind(
+            evalType(index, decls),
+            \index_ty -> {
+                maybeBind2(
+                    \a, b -> maybeMerge(a, b),
+                )(
+                    inferTypesExpr(decls, array, ArrayType(suggested, index_ty)),
+                    inferTypesExpr(decls, index, index_ty)
+                )
+            }
+        );
+
+        Array(values): switch (suggested) {
+            ArrayType(base, index): foldM(
+                values,
+                makeTree(),
+                \tree, value -> {
+                    maybeBind(
+                        inferTypesExpr(decls, value, base),
+                        \tys -> maybeMerge(tree, tys)
+                    )
+                }
+            );
+
+            IntType(): None();
+        };
+    }
 }

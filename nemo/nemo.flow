@@ -7,6 +7,7 @@ export {
     isValidProgram(program: Program) -> bool;
     expr2s(expr: Expr) -> string;
     cond2s(cond: Condition) -> string; 
+    evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type>;
 
     Expr ::= Add, Sub, Mul, Div, Neg, Int, Var, Apply, Update, Array;
         Add(lhs: Expr, rhs: Expr);
@@ -22,7 +23,7 @@ export {
 
     Type ::= IntType, ArrayType;
         IntType();
-        ArrayType(type: Type);
+        ArrayType(base: Type, index: Type);
 
     Relation ::= Equal, NotEqual, Less, LessOrEqual, Greater, GreaterOrEqual;
         Equal();
@@ -187,7 +188,7 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
                 if (left == IntType() && right == IntType()) {
                     Some(IntType());
                 } else {
-                    println("operand of a binary operation should have int type");
+                    // println("operand of a binary operation should have int type");
                     None();
                 }
             }
@@ -206,7 +207,7 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
                             evalType(e, types),
                             \e_ty -> {
                                 if (e_ty == type) {
-                                    Some(ArrayType(type));
+                                    Some(ArrayType(type, IntType()));
                                 } else {
                                     None();
                                 }
@@ -227,26 +228,22 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
                     evalType(value, types),
                     \value_ty -> {
                         switch (array_ty) {
-                            ArrayType(element_ty): {
-                                switch (index_ty) {
-                                    IntType(): {
-                                        if (element_ty == value_ty) {
-                                            Some(array_ty);
-                                        } else {
-                                            println("array element type does not match value in upd");
-                                            None();
-                                        }
-                                    }
-
-                                    ArrayType(_): {
-                                        println("array index must be an integer");
+                            ArrayType(base, __index): {
+                                if (__index == index_ty) {
+                                    if (base == value_ty) {
+                                        Some(array_ty);
+                                    } else {
+                                        // println("array element type does not match value in upd");
                                         None();
                                     }
+                                } else {
+                                    // println("wrong array index type");
+                                    None();
                                 }
                             }
 
                             IntType(): {
-                                println("first argument to upd must be an array");
+                                // println("first argument to upd must be an array");
                                 None();
                             }
                         }
@@ -263,18 +260,17 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
                 evalType(index, types),
                 \index_ty -> {
                     switch (array_ty) {
-                        ArrayType(value_ty): {
-                            switch (index_ty) {
-                                IntType(): Some(value_ty);
-                                ArrayType(_): {
-                                    println("array index must be an integer");
-                                    None();
-                                }
+                        ArrayType(base, __index_ty): {
+                            if (__index_ty == index_ty) {
+                                Some(base)
+                            } else {
+                                // println("wrong index type");
+                                None();
                             }
                         };
 
                         IntType(): {
-                            println("first argument to app must be an array");
+                            // println("first argument to app must be an array");
                             None();
                         }
                     }
@@ -288,8 +284,8 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
             evalType(inner, types),
             \type -> {
                 switch (type) {
-                    ArrayType(_): {
-                        println("can't negate an array");
+                    ArrayType(base, index): {
+                        // println("can't negate an array");
                         None();
                     };
 
@@ -315,7 +311,7 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
     switch (ret) {
         Some(r): Some(r);
         None(): {
-            println("error in expression " + expr2s(expr));
+            // println("error in expression " + expr2s(expr));
             None();
         }
     }
@@ -388,8 +384,8 @@ assignment2s(assignment: Assignment) -> string {
 
 type2s(type: Type) -> string {
     switch (type) {
-        IntType(): "int";
-        ArrayType(inner): "[" + type2s(inner) + "]";
+        IntType(): "INT";
+        ArrayType(base, index): type2s(index) + " ARRAY OF " + type2s(base);
     }
 }
 

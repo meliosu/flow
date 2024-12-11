@@ -19,7 +19,7 @@ array = ws "[" ws expr:first ("," ws expr)*:other ws "]" ws { buildArray(:first,
 type = int_type | array_type;
 
 int_type = ws "INT" ws  { IntType() };
-array_type = ws int_type ws "ARRAY" ws "OF" ws type:type  ws { ArrayType(:type) };
+array_type = ws int_type:int ws "ARRAY" ws "OF" ws type:type  ws { ArrayType(:type, :int) };
 
 relation = 
       "=" { Equal() }

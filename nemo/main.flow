@@ -12,8 +12,6 @@ main() {
     example = "
         {(x = a ∧ y = b)}
         {
-            VAR a: INT;
-            VAR b: INT;
             VAR x: INT;
             VAR y: INT;
             {
