@@ -208,7 +208,75 @@ main() {
         { (sqr(x) <= n & sqr((1 + x)) > n) }
     ";
 
-    triple = parseAst(Example1);
+    EXAMPLE1 = "
+        VAR x : INT;
+        VAR y : INT;
+        VAR a : INT;
+        VAR b : INT;
+        VAR z : INT;
+        VAR t : INT;
+        VAR s : INT;
+
+        formula divides(x, y) 
+            (
+                (x > 0) &
+                (
+                    (y > 0) &
+                    E t.(y = (t * x))
+                )
+            )
+        
+        formula gcd(x, y, z)
+            (
+                (x > 0) &
+                (
+                    (y > 0) &
+                    (
+                        divides(z, x) &
+                        (
+                            divides(z, y) &
+                            A s.((divides(s, x) & divides(s, y)) -> (s <= z))
+                        )
+                    )
+                )
+            )
+
+        { ((x = a) & (y = b)) }
+        {
+            { A t.(gcd(a, b, t) <-> gcd(x, y, t)) } {
+                {{ (x > y)?; x := (x - y); } U
+                { (x < y)?; y := (y - x); }};
+            }*;
+            (x = y)?;
+        }
+        { gcd(a, b, x) }
+    ";
+
+    EXAMPLE2 = "
+        VAR n : INT;
+        VAR x : INT;
+        VAR y : INT;
+
+        function sqr(x)
+        (x * x)
+
+        { (n >= 0) }
+        {
+            x := 0;
+            y := 0;
+            { ((n >= 0) & ((y = sqr(x)) & ((sqr((x - 1)) <= n) || (x = 0)))) }
+            {(y <= n)?;
+                y := (y + (x + (x + 1)));
+                x := (x + 1);
+                
+            }*;
+            !(y <= n)?;
+            x := (x - 1);
+        }
+        { ((sqr(x) <= n) & (sqr((1 + x)) > n)) }
+    ";
+
+    triple = parseAst(EXAMPLE1);
     // println(triple);
 
     println("AST:\n");

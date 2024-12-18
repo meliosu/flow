@@ -96,6 +96,16 @@ parseAst(input: string) -> HoareTriple {
                         Iteration(Sequence(b[0]), b[1])
                     }
                 }),
+                Pair("buildTriple", \a -> HoareTriple(
+                    a[1],
+                    a[2],
+                    a[3],
+                    Program(
+                        a[0],
+                        a[4]
+                    ),
+                    a[5]
+                )),
             ]
         )
     )

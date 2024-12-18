@@ -35,17 +35,25 @@ replaceVarCond(cond: Condition, var: string, target: Expr) -> Condition {
         };
 
         Exists(v, body): {
-            Exists(
-                v,
-                replaceVarCond(body, var, target)
-            )
+            if (v != var) {
+                Exists(
+                    v,
+                    replaceVarCond(body, var, target)
+                )
+            } else {
+                Exists(v, body)
+            }
         };
 
         Forall(v, body): {
-            Forall(
-                v,
-                replaceVarCond(body, var, target)
-            )
+            if (v != var) {
+                Forall(
+                    v,
+                    replaceVarCond(body, var, target)
+                )
+            } else {
+                Forall(v, body)
+            }
         }
     }
 }

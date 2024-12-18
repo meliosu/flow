@@ -103,10 +103,7 @@ formulaZ3(formula: Condition) -> string {
             "(" + symbol + " " + strGlue(map(args, exprZ3), " ") + ")"
         }
 
-        Exists(var, body): formulaZ3(
-            Not(Forall(var, Not(body)))
-        );
-
+        Exists(var, body): quantor("exists", var, body);
         Forall(var, body): quantor("forall", var, body);
     }
 }
