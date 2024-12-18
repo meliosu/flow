@@ -1,9 +1,18 @@
-hoare_triple = ws "{" ws condition:pre ws "}" ws "{" ws program:program ws "}" ws "{" ws condition:post ws "}" ws 
-  { HoareTriple(:pre, :program, :post) }; 
+hoare_triple = ws function*:functions ws formula*:formulas ws "{" ws condition:pre ws "}" ws "{" ws program:program ws "}" ws "{" ws condition:post ws "}" ws 
+  { HoareTriple(:functions, :formulas, :pre, :program, :post) }; 
+
+function = ws "function" ws name$name ws "(" ws ident:first ws _param*:other ws ")" ws expr:b ws { buildFunction($name, :first, :other, :b) };
 
 program = ws declaration*:decls ws body:body ws { Program(:decls, :body) };
 
-expr = add | sub | mul | div | neg | int | apply | update | array | var;
+ident = ws name$n ws { $n };
+
+formula = ws "formula" ws ident:fname ws "(" ws ident:first ws _param*:other ws ")" ws condition:b ws 
+  { buildFormula(:fname, :first, :other, :b) }; 
+
+_param = ws "," ws name$n ws { $n }; 
+
+expr = function_call | add | sub | mul | div | neg | int | apply | update | array | var;
 
 add = ws "(" ws expr:lhs ws "+" ws expr:rhs ws ")" ws { Add(:lhs, :rhs) };
 sub = ws "(" ws expr:lhs ws "-" ws expr:rhs ws ")" ws { Sub(:lhs, :rhs) };
@@ -15,6 +24,7 @@ var = name$name { Var($name) };
 apply = ws "APP" ws "(" ws expr:array ws "," ws expr:index ws ")" ws { Apply(:array, :index) };
 update = ws "UPD" ws "(" ws expr:array ws "," ws expr:index ws "," ws expr:value ws ")" ws { Update(:array, :index, :value) };
 array = ws "[" ws expr:first ("," ws expr)*:other ws "]" ws { buildArray(:first, :other) };
+function_call = ws ident:n ws "(" ws expr:first ws _arg*:other ws ")" ws { buildFunctionCall(:n, :first, :other) };
 
 type = int_type | array_type;
 
@@ -29,15 +39,21 @@ relation =
     | ">=" { GreaterOrEqual() }
     | ">"  { Greater() };
 
-condition = true | false | comparison | and | or | implies | not;
+condition =  exists | forall  | iff | and | or | implies | not | comparison | true | false | call;
 
+exists = ws "E" ws name$var ws "." ws condition:body ws { Exists($var, :body) };
+forall = ws "A" ws name$var ws "." ws condition:body ws { Forall($var, :body) };
 true = ws "TRUE" ws { True() };
 false = ws "FALSE" ws { False() }; 
 comparison = ws expr:lhs ws relation:relation ws expr:rhs ws { Comparison(:lhs, :relation, :rhs) };
-and = ws "(" ws condition:lhs ws ("&&" | "∧") ws condition:rhs ws ")" ws { And(:lhs, :rhs) };
-or = ws "(" ws condition:lhs ws ("||" | "∨") ws condition:rhs ws ")" ws { Or(:lhs, :rhs) };
+and = ws "(" ws condition:lhs ws ("&&" | "&" | "∧") ws condition:rhs ws ")" ws { And(:lhs, :rhs) };
+or = ws "(" ws condition:lhs ws ("||" | "|" | "∨") ws condition:rhs ws ")" ws { Or(:lhs, :rhs) };
 implies = ws "(" ws condition:lhs ws "->" ws condition:rhs ws ")" ws { Implies(:lhs, :rhs) };
 not = ws "!" ws "(" ws condition:condition ws ")" ws { Not(:condition) };
+call = ws ident:n ws "(" ws expr:first ws _arg*:other ws ")" ws { buildCall(:n, :first, :other) };
+iff = ws "(" ws condition:lhs ws "<->" ws condition:rhs ws ")" ws { Iff(:lhs, :rhs) };
+
+_arg = ws "," ws expr:arg ws { :arg };
 
 declaration = ws "VAR" ws name$name ws ":" ws type:type ws ";" ws { Declaration($name, :type) };
 

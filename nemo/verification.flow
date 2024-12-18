@@ -14,6 +14,7 @@ replaceVarCond(cond: Condition, var: string, target: Expr) -> Condition {
         And(lhs, rhs): binop(lhs, rhs, \l, r -> And(l, r));
         Or(lhs, rhs): binop(lhs, rhs, \l, r -> Or(l, r));
         Implies(lhs, rhs): binop(lhs, rhs, \l, r -> Implies(l, r));
+        Iff(lhs, rhs): binop(lhs, rhs, \l, r -> Iff(l, r));
         Not(inner): Not(replaceVar(inner));
         Comparison(lhs, relation, rhs): {
             Comparison(
@@ -22,6 +23,30 @@ replaceVarCond(cond: Condition, var: string, target: Expr) -> Condition {
                 replaceVarExpr(rhs, var, target)
             )
         };
+
+        Call(name, args): {
+            Call(
+                name,
+                map(
+                    args,
+                    \arg -> replaceVarExpr(arg, var, target)
+                )
+            )
+        };
+
+        Exists(v, body): {
+            Exists(
+                v,
+                replaceVarCond(body, var, target)
+            )
+        };
+
+        Forall(v, body): {
+            Forall(
+                v,
+                replaceVarCond(body, var, target)
+            )
+        }
     }
 }
 
@@ -52,6 +77,13 @@ replaceVarExpr(expr: Expr, var: string, target: Expr) -> Expr {
         };
         Array(values): {
             Array(map(values, replaceVar))
+        };
+
+        FunctionCall(symbol, args): {
+            FunctionCall(
+                symbol,
+                map(args, \arg -> replaceVarExpr(arg, var, target))
+            )
         };
     }
 }

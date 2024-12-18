@@ -15,6 +15,32 @@ declZ3(decl: Declaration) -> string {
     "(declare-const " + decl.variable + " " + typeZ3(decl.type) + ")"
 }
 
+formulaDefinitionZ3(formula: Formula, types: Tree<string, Type>) -> string {
+    "(define-fun " + formula.name + " (" +
+        strGlue(
+            map(
+                formula.params,
+                \param -> "(" + param + " " + typeZ3(either(lookupTree(types, param), IntType()))+  ")"
+            ),
+
+            " "
+        )
+    + ")" + " Bool " + formulaZ3(formula.body) + ")"
+}
+
+functionDefinitionZ3(function: Function, types: Tree<string, Type>) -> string {
+    "(define-fun " + function.name + " (" +
+        strGlue(
+            map(
+                function.params,
+                \param -> "(" + param + " " + typeZ3(either(lookupTree(types, param), IntType()))+  ")"
+            ),
+
+            " "
+        )
+    + ")" + " Int " + exprZ3(function.body) + ")"
+}
+
 exprZ3(expr: Expr) -> string {
     binop = \lhs, sign, rhs -> {
         "(" + sign + " " + exprZ3(lhs) + " " + exprZ3(rhs) + ")"
@@ -37,6 +63,9 @@ exprZ3(expr: Expr) -> string {
         Array(values): {
             "[" + strGlue(map(values, exprZ3), ", ") + "]"
         };
+        FunctionCall(symbol, args): {
+            "(" + symbol + " " + strGlue(map(args, exprZ3), " ") + ")"
+        };
     }
 }
 
@@ -48,6 +77,10 @@ formulaZ3(formula: Condition) -> string {
     binary = \lhs, sign, rhs -> {
         "(" + sign + " " + formulaZ3(lhs) + " " + formulaZ3(rhs) + ")"
     };
+
+    quantor = \func, var, body -> {
+        "(" + func + " ((" + var + " Int))" + formulaZ3(body) + ")"
+    };
     
     switch (formula) {
         True(): "true";
@@ -55,6 +88,7 @@ formulaZ3(formula: Condition) -> string {
         And(lhs, rhs): binary(lhs, "and", rhs);
         Or(lhs, rhs): binary(lhs, "or", rhs);
         Implies(lhs, rhs): binary(lhs, "=>", rhs);
+        Iff(lhs, rhs): binary(lhs, "=", rhs);
         Not(inner): "(not " + formulaZ3(inner) + ")";
         Comparison(lhs, relation, rhs): switch (relation) {
             Equal(): comparison(lhs, "=", rhs);
@@ -64,6 +98,16 @@ formulaZ3(formula: Condition) -> string {
             Greater(): comparison(lhs, ">", rhs);
             GreaterOrEqual(): comparison(lhs, ">=", rhs);
         }
+
+        Call(symbol, args): {
+            "(" + symbol + " " + strGlue(map(args, exprZ3), " ") + ")"
+        }
+
+        Exists(var, body): formulaZ3(
+            Not(Forall(var, Not(body)))
+        );
+
+        Forall(var, body): quantor("forall", var, body);
     }
 }
 
@@ -71,17 +115,25 @@ translateZ3(triple: HoareTriple, formulas: [Condition]) -> Maybe<string> {
     maybeMap(
         inferTypes(triple.program.decls, formulas),
         \types -> strGlue(
-            concat3(
+            concatA([
                 map(
                     tree2pairs(types),
                     \pair -> declZ3(Declaration(pair.first, pair.second))
+                ),
+                map(
+                    triple.formulas,
+                    \formula -> formulaDefinitionZ3(formula, types)
+                ),
+                map(
+                    triple.functions,
+                    \function -> functionDefinitionZ3(function, types),
                 ),
                 map(
                     formulas,
                     \formula -> "(assert " + formulaZ3(Not(formula)) + ")"
                 ),
                 ["(check-sat)"]
-            ),
+            ]),
             "\n"
         )
     )
@@ -151,6 +203,8 @@ inferTypesCond(decls: Tree<string, Type>, formula: Condition) -> Maybe<Tree<stri
             inferTypesExpr(decls, lhs, IntType()), 
             inferTypesExpr(decls, rhs, IntType())
         );
+
+        default: Some(makeTree());
     }
 }
 
@@ -232,5 +286,7 @@ inferTypesExpr(decls: Tree<string, Type>, expr: Expr, suggested: Type) -> Maybe<
 
             IntType(): None();
         };
+
+        default: Some(makeTree());
     }
 }

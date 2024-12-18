@@ -9,7 +9,7 @@ export {
     cond2s(cond: Condition) -> string; 
     evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type>;
 
-    Expr ::= Add, Sub, Mul, Div, Neg, Int, Var, Apply, Update, Array;
+    Expr ::= Add, Sub, Mul, Div, Neg, Int, Var, Apply, Update, Array, FunctionCall;
         Add(lhs: Expr, rhs: Expr);
         Sub(lhs: Expr, rhs: Expr);
         Mul(lhs: Expr, rhs: Expr);
@@ -20,6 +20,7 @@ export {
         Update(array: Expr, index: Expr, value: Expr);
         Apply(array: Expr, index: Expr);
         Array(values: [Expr]);
+        FunctionCall(name: string, args: [Expr]);
 
     Type ::= IntType, ArrayType;
         IntType();
@@ -33,14 +34,18 @@ export {
         Greater();
         GreaterOrEqual();
 
-    Condition ::= True, False, And, Or, Implies, Not, Comparison;
+    Condition ::= True, False, And, Or, Implies, Not, Comparison, Call, Exists, Forall, Iff;
         True();
         False();
         And(lhs: Condition, rhs: Condition);
         Or(lhs: Condition, rhs: Condition);
         Implies(lhs: Condition, rhs: Condition);
+        Iff(lhs: Condition, rhs: Condition);
         Not(cond: Condition);
         Comparison(lhs: Expr, relation: Relation, rhs: Expr);
+        Call(symbol: string, args: [Expr]);
+        Exists(variable: string, body: Condition);
+        Forall(variable: string, body: Condition);
 
     Body ::= Assignment, Test, Sequence, Selection, Iteration;
         Assignment(variable: string, expr: Expr);
@@ -49,9 +54,13 @@ export {
         Selection(bodies: [Body]);
         Iteration(body: Body, inv: Condition);
 
+    Hueta(formulas: [Formula]);
+
     Declaration(variable: string, type: Type);
     Program(decls: [Declaration], body: Body);
-    HoareTriple(pre: Condition, program: Program, post: Condition);
+    HoareTriple(functions: [Function], formulas: [Formula], pre: Condition, program: Program, post: Condition);
+    Formula(name: string, params: [string], body: Condition);
+    Function(name: string, params: [string], body: Expr);
 }
 
 parseAst(input: string) -> HoareTriple {
@@ -62,6 +71,24 @@ parseAst(input: string) -> HoareTriple {
             [
                 Pair("buildArray", \a -> Array(concat([a[0]], a[1]))),
                 Pair("buildSelection", \a -> Selection(concat([a[0]], a[1]))),
+                Pair("buildFormula", \a -> Formula( 
+                    a[0],
+                    concat([a[1]], a[2]),
+                    a[3]
+                )),
+                Pair("buildFunction", \a -> Function( 
+                    a[0],
+                    concat([a[1]], a[2]),
+                    a[3]
+                )),
+                Pair("buildCall", \a -> Call(
+                    a[0],
+                    concat([a[1]], a[2])
+                )),
+                Pair("buildFunctionCall", \a -> FunctionCall(
+                    a[0],
+                    concat([a[1]], a[2])
+                )),
                 Pair("buildIteration", \b -> {
                     if (length(b[0]) == 1) {
                         Iteration(b[0][0], b[1])
@@ -172,6 +199,7 @@ isValidCondition(condition: Condition, types: Tree<string, Type>) -> bool {
         Implies(lhs, rhs): isValidCondition(lhs, types) && isValidCondition(rhs, types);
         Not(cond): isValidCondition(cond, types);
         Comparison(lhs, _, rhs): isValidComparison(lhs, rhs);
+        default: true;
     };
 
     if (!ret) {
@@ -306,6 +334,9 @@ evalType(expr: Expr, types: Tree<string, Type>) -> Maybe<Type> {
         Array(values): evalArrayType(values);
         Apply(array, index): evalApplyType(array, index);
         Update(array, index, value): evalUpdateType(array, index, value);
+        FunctionCall(symbol, args): {
+            Some(IntType())
+        };
     };
 
     switch (ret) {
@@ -352,6 +383,9 @@ expr2s(expr: Expr) -> string {
         Array(array): array2s(array);
         Update(array, index, value): update2s(array, index, value);
         Apply(array, index): apply2s(array, index);
+        FunctionCall(symbol, args): {
+            symbol + "(" + strGlue(map(args, expr2s), ", ") + ")"
+        };
     }
 }
 
@@ -373,8 +407,20 @@ cond2s(cond: Condition) -> string {
         And(lhs, rhs): "(" + cond2s(lhs) + " & " + cond2s(rhs) + ")";
         Or(lhs, rhs): "(" + cond2s(lhs) + " v " + cond2s(rhs) + ")";
         Implies(lhs, rhs): "(" + cond2s(lhs) + " -> " + cond2s(rhs) + ")";
+        Iff(lhs, rhs): "(" + cond2s(lhs) + "<->" + cond2s(rhs) + ")";
         Not(inner): "!(" + cond2s(inner)+ ")";
         Comparison(lhs, relation, rhs): expr2s(lhs) + " " + relation2s(relation) + " " + expr2s(rhs);
+        Call(symbol, args): {
+            symbol + "(" + strGlue(map(args, expr2s), ", ") + ")"
+        }
+
+        Exists(var, body): {
+            "E " + var + "." + cond2s(body)
+        };
+
+        Forall(var, body): {
+            "A " + var + "." + cond2s(body)
+        };
     }
 }
 
