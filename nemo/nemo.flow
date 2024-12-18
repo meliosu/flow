@@ -54,8 +54,6 @@ export {
         Selection(bodies: [Body]);
         Iteration(body: Body, inv: Condition);
 
-    Hueta(formulas: [Formula]);
-
     Declaration(variable: string, type: Type);
     Program(decls: [Declaration], body: Body);
     HoareTriple(functions: [Function], formulas: [Formula], pre: Condition, program: Program, post: Condition);
