@@ -2,6 +2,7 @@ import nemo;
 
 export {
     findVC(Condition, Body, Condition) -> Set<Condition>;
+    generateVCs(triple: HoareTriple) -> Set<Condition>;
 }
 
 replaceVarCond(cond: Condition, var: string, target: Expr) -> Condition {
@@ -148,5 +149,79 @@ findVC(pre: Condition, body: Body, post: Condition) -> Set<Condition> {
             findVC(inv, inner, inv),
             Implies(pre, inv)
         );
+    }
+}
+
+generateVCs(triple: HoareTriple) -> Set<Condition> {
+    avc = _findVC(triple.post, triple.program.body);
+
+    fold(
+        concat(
+            [Implies(triple.pre, avc.ac)],
+            set2array(avc.vc)
+        ), 
+        makeSet(),
+        insertSet
+    )
+}
+
+NemoVC(
+    ac: Condition,
+    vc: Set<Condition>,
+);
+
+_findVC(psi: Condition, body: Body) -> NemoVC {
+    switch (body) {
+        Assignment(var, expr): NemoVC(
+            replaceVarCond(psi, var, expr),
+            makeSet()
+        );
+
+        Test(cond): NemoVC(
+            Implies(cond, psi),
+            makeSet()
+        );
+
+        Sequence(bodies): fold(
+            reverseA(bodies),
+            NemoVC(psi, makeSet()),
+            \acc, s -> {
+                avc = _findVC(acc.ac, s);
+
+                NemoVC(
+                    avc.ac,
+                    mergeSets(acc.vc, avc.vc)
+                )
+            }
+        );
+
+        Selection(bodies): fold(
+            bodies,
+            NemoVC(True(), makeSet()),
+            \acc, s -> {
+                avc = _findVC(psi, s);
+
+                NemoVC(
+                    And(acc.ac, avc.ac),
+                    mergeSets(acc.vc, avc.vc)
+                )
+            }
+        );
+
+        Iteration(inner, inv): {
+            avc = _findVC(inv, inner);
+
+            NemoVC(
+                inv,
+                insertSet(
+                    insertSet(
+                        avc.vc,
+                        Implies(inv, psi)
+                    ),
+
+                    Implies(inv, avc.ac)
+                )
+            )
+        }
     }
 }
